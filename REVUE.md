@@ -252,7 +252,7 @@ Contrairement à ce que disait une première version de PROCESSUS §9, une véri
 
 ## 10 ter. Reproduire
 
-Données hors git, dans un dossier `<data>` (ici `C:\Users\kil\kct-data`). Python 3.10, numpy 2.2, Node 22. Graines fixes : `dataset.py` (`random.Random(0)`), `train.py` (`default_rng(0)`), `pseudo.py` (`default_rng(0)`).
+Données hors git, dans un dossier `<data>`. Python 3.10, numpy 2.2, Node 22. Graines fixes : `dataset.py` (`random.Random(0)`), `train.py` (`default_rng(0)`), `pseudo.py` (`default_rng(0)`).
 
 ```
 python tools/lid/fetch_tatoeba.py --data <data>          # export per_language de downloads.tatoeba.org
