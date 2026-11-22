@@ -58,6 +58,8 @@ Le détail de chaque expérience est dans [journal.md](journal.md).
 
 Le code vit dans la branche [`feat/lid-inference`](https://github.com/kilworks/kick-chat-translator/tree/feat/lid-inference) de l'extension : inférence dans `src/content/lid/`, entraînement et bancs dans `tools/lid/` (numpy, Node). Spécification et plan : `docs/superpowers/` de la même branche.
 
+La collecte de chat (Kick et Twitch, plusieurs machines en parallèle) se suit dans un tableau de bord en console publié à part : [tui-dash](https://github.com/kilworks/tui-dash).
+
 ## Licences
 
 - Textes et page de ce dépôt : MIT.
