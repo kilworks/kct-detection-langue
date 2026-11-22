@@ -28,7 +28,7 @@ Le modèle étudié ici sera livré dans une prochaine version de Kick Chat Tran
 [![Inférence](https://img.shields.io/badge/inf%C3%A9rence-%3C_1_ms_par_ligne-c4561a)](#la-méthode)
 [![Licence](https://img.shields.io/badge/licence-MIT-8a6d1f)](LICENSE)
 
-**[Essayer la démo](https://kilworks.github.io/kct-detection-langue/)** · [Journal des expériences](journal.md) · [Code](https://github.com/kilworks/kick-chat-translator/tree/feat/lid-inference)
+**[Essayer la démo](https://kilworks.github.io/kct-detection-langue/)** · [Journal des expériences](journal.md) · [Dossier de revue](REVUE.md) · [Code](https://github.com/kilworks/kick-chat-translator/tree/feat/lid-inference)
 
 </div>
 
