@@ -2,6 +2,21 @@
 
 <div align="center">
 
+<sub>UN PROJET DE RECHERCHE DE</sub>
+
+### [Kick Chat Translator](https://github.com/kilworks/kick-chat-translator)
+
+<sub>l'extension qui traduit le chat de Kick en direct, dans la langue de chaque spectateur</sub>
+
+[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/nkkjmbkmacbdkboijmnhjnblcaiclhni?label=Chrome%20Web%20Store&color=53fc18)](https://chromewebstore.google.com/detail/kick-chat-translator/nkkjmbkmacbdkboijmnhjnblcaiclhni)
+[![Utilisateurs](https://img.shields.io/chrome-web-store/users/nkkjmbkmacbdkboijmnhjnblcaiclhni?label=utilisateurs&color=53fc18)](https://chromewebstore.google.com/detail/kick-chat-translator/nkkjmbkmacbdkboijmnhjnblcaiclhni)
+[![Firefox Add-on](https://img.shields.io/amo/v/kick-chat-translator?label=Firefox%20Add-on&color=53fc18)](https://addons.mozilla.org/firefox/addon/kick-chat-translator/)
+
+Ce dépôt documente comment l'extension va reconnaître la langue de chaque message.<br/>
+Le modèle étudié ici sera livré dans une prochaine version de Kick Chat Translator, une fois heldout lu.
+
+---
+
 # Détection de langue par inférence
 
 **Un modèle entraîné, livré dans l'extension [Kick Chat Translator](https://github.com/kilworks/kick-chat-translator), qui devine la langue de chaque message du chat, chez l'utilisateur, sans service externe.**
