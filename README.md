@@ -39,12 +39,12 @@ Le modèle étudié ici sera livré dans une prochaine version de Kick Chat Tran
 | | Avant (master) | Modèle seul | Modèle + adaptation par chaîne |
 |---|:---:|:---:|:---:|
 | **Coût moyen par ligne** (Brave, plus bas = mieux) | 0,531 | 0,296 | **0,203** |
-| **Réponses fausses** sur 711 lignes de chat | 121 | 23 | 11 |
+| **Réponses justes / silences / fausses** sur 711 lignes de chat (Brave) | 445 / 145 / 121 | 564 / 124 / 23 | 598 / 102 / 11 |
 | **Banc Tatoeba**, bonne langue trouvée | 82 % | 98 % | 98 % |
 
 > Chiffres sur le jeu **dev** : ils ont servi à choisir le modèle, ils sont donc optimistes. Le jeu **heldout** (993 lignes) ne sera lu qu'une fois pour ce modèle, à la fin ; ses totaux ont déjà servi à mesurer le détecteur actuel.
 >
-> Intervalles à 95 % (bootstrap apparié sur les 232 chaînes de dev) : le gain sur `master` et celui de l'adaptation sont nets ; celui de l'auto-apprentissage ne l'est pas encore. Référence publique : fastText lid.176 à la même place fait 0,390 de coût moyen. Détail dans [REVUE.md](REVUE.md) §10 bis.
+> Intervalles à 95 % (bootstrap apparié sur les 232 couples fichier:chaîne de dev) : le gain sur `master` et celui de l'adaptation sont nets ; celui de l'auto-apprentissage ne l'est pas encore. Référence publique : fastText lid.176 à la même place fait 0,390 de coût moyen. Détail dans [REVUE.md](REVUE.md) §10 bis.
 
 ---
 
@@ -61,7 +61,7 @@ L'extension doit connaître la langue de chaque message **avant** de le traduire
 
 Ces coûts ont été fixés **avant** toute mesure. Les seuils du modèle minimisent ce coût sous une contrainte stricte : **aucune hausse des messages cachés à tort, pour aucun lecteur et aucun navigateur.**
 
-Le détecteur actuel (`franc-min` et des tables de mots) se trompe sur 24 % des phrases Tatoeba et sur 17 % des lignes de chat réel annotées.
+Le détecteur actuel (`franc-min` et des tables de mots) se trompe sur 17,7 % des phrases Tatoeba (`franc-min` seul : 24 %) et sur 17 % des lignes de chat réel annotées (121 sur 711).
 
 ---
 
@@ -85,7 +85,7 @@ flowchart LR
 | **Entraînement** | Tatoeba (42 langues), augmenté vers le registre du chat : minuscules, sans ponctuation, fenêtres de 1 à 4 mots, sans accents, hindi et bengali romanisés |
 | **Auto-apprentissage** | chat Kick et Twitch non étiqueté, pseudo-étiquettes sûres (p ≥ 0,9 et langue déclarée de la chaîne d'accord) |
 | **Adaptation par chaîne** | l'extension compte les langues dont elle est sûre dans la chaîne en cours et ajuste ses probabilités, sans jamais voir la ligne jugée |
-| **Évaluation** | 711 lignes Kick annotées (dev) + 993 gardées de côté (heldout), jamais publiées, seuls les agrégats le sont |
+| **Évaluation** | 711 lignes Kick annotées (dev) + 993 gardées de côté (heldout), jamais publiées, seuls les agrégats le sont ; heldout est coupé ligne par ligne et partage les chaînes de dev |
 
 ---
 
@@ -109,8 +109,8 @@ xychart-beta
     bar [0.531, 0.296, 0.203]
 ```
 
-- **Sans détecteur du navigateur**, les réponses fausses passent de 121 à 23 sur 711 lignes (107 corrigées, 9 cassées, McNemar χ² = 81).
-- **Adaptation par chaîne**, simulée sur 515 vraies chaînes (médiane 22 lignes) : coût 0,306 → 0,209, langues sources fausses 15 → 10.
+- **Sans détecteur du navigateur**, les réponses fausses passent de 121 à 23 sur 711 lignes (base-b15, E3 ; 107 corrigées, 9 cassées, McNemar χ² = 81).
+- **Adaptation par chaîne**, version causale (E6c), simulée sur les captures du 04/11 (515 couples fichier:chaîne ayant au moins une ligne sûre, médiane 22 lignes) : coût moyen des 3 chemins 0,306 → 0,210, langues sources fausses 15 → 11.
 
 ### Auto-apprentissage sur le chat collecté (E9)
 

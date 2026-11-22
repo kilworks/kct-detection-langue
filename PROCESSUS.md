@@ -130,7 +130,7 @@ Le poids **0,5 du silence** suppose que donner la bonne langue source au cloud a
 
 - **Tatoeba** : phrases propres, bien étiquetées, 42 langues, licence compatible. Mais ce n'est pas du chat : ponctuation, majuscules, phrases complètes.
 - **Des captures de chat Kick du 04/11** (environ 28 000 lignes), sans étiquette fiable : seule la langue **déclarée par la chaîne** est connue.
-- **Un jeu annoté** (environ 2 000 lignes de ces captures, annotées ligne à ligne), coupé **par capture** (jamais par ligne, pour éviter qu'une même conversation soit des deux côtés) en :
+- **Un jeu annoté** (environ 2 000 lignes de ces captures, annotées ligne à ligne), prévu par capture (pour éviter qu'une même conversation soit des deux côtés), en réalité coupé **ligne par ligne** dans chaque langue (REVUE §3 bis), donc une même conversation est des deux côtés, en :
   - **dev** : sert à tout choisir ; 711 lignes y sont étiquetées dans une seule langue (les autres sont neutres, « autre » ou mélangées, et n'entrent pas dans le coût) ;
   - **heldout** : 993 lignes, empreinte sha256 vérifiée, **à lire une seule fois**, à la fin.
 
@@ -215,7 +215,7 @@ p_corrigée(langue) ∝ p_modèle(langue) · pi_chaine(langue) / pi_entraînemen
 - Une chaîne qui change de langue (invité étranger, raid) sera en retard ; `k` petit limite le retard.
 - Si la langue dominante est mal reconnue au départ, l'adaptation peut renforcer l'erreur (boucle).
 - `k` a été choisi sur dev.
-- Les chaînes de dev sont courtes (médiane 22 lignes) ; en direct, les chaînes sont plus longues, ce qui devrait aider, mais ce n'est pas mesuré.
+- Les chaînes de dev sont courtes (médiane 22 lignes) ; en direct, les chaînes sont plus longues. Mesuré depuis : sur le chat non étiqueté (pool E9b, 313 989 lignes, 2 050 couples fichier:chaîne, accrom-b16, k = 10, `review_checks.py` partie B), la part des lignes qui reçoivent une langue source contraire au choix du modèle seul passe de 0,09 % (moins de 10 lignes sûres vues avant dans la chaîne) à 1,76 % (10 à 50, le cas de dev), 3,65 % (50 à 200), 5,20 % (200 à 1 000) et 7,17 % (plus de 1 000) ; les lignes dont le modèle seul était sûr (p ≥ 0,9, justes à 98,4 % sur dev) sont retournées dans 0,16 % puis 1,24 % des cas. Une chaîne longue n'aide donc pas d'elle-même : la loi a priori pèse de plus en plus. Juste ou faux n'est pas mesurable sans étiquettes ; à trancher avant le portage (fenêtre glissante, plancher, adaptation tenue hors de `sl`).
 
 ---
 
@@ -266,6 +266,8 @@ La spécification et le plan ont été écrits **avant** le travail (dans la bra
 | `franc` retiré s'il est battu dans chaque tranche de longueur | pas encore tranché | |
 | p95 sous 0,3 ms par ligne en build de production | p95 0,044 ms en Node sur le PC de développement (REVUE §10 bis) | navigateur réel et machine modeste pas mesurés |
 | B conditionné à un résidu chiffré | pas encore mesuré | |
+| Coupe dev/heldout par capture, jamais par ligne | coupe ligne par ligne par langue (`real-bench.mjs`, 04/11), deux fichiers de capture seulement | heldout partage chaînes et conversations avec dev : il ne mesure pas la généralisation |
+| Sortie : 42 langues plus `und` | 42 labels, pas de `und` : le silence passe par les seuils | pas de classe de rejet apprise (romanisé, langues hors liste) |
 | Test de fumée de 15 minutes sur kick.com, PR sans fusion | pas encore | la recherche n'est pas finie |
 
 ---
@@ -278,6 +280,7 @@ La spécification et le plan ont été écrits **avant** le travail (dans la bra
 4. **Pseudo-étiquettes « anglais » sur des chaînes indiennes.** Une langue déclarée (« English (India) ») a été traitée comme « en », alors que ces chaînes écrivent en hinglish. Vu seulement grâce au contrôle Kick seul / Twitch seul.
 5. **Collecte trop agressive.** L'adresse a été limitée par Kick parce que le rythme a été poussé avant d'avoir un garde-fou sur les refus.
 6. **Ne pas utiliser toutes les machines d'emblée.** La collecte a d'abord été poussée sur une seule machine, alors que d'autres étaient disponibles ; c'est le propriétaire qui l'a fait remarquer.
+7. **Affirmer la coupe par capture sans relire le script.** La spécification exigeait une coupe par capture ; le dossier l'a affirmée sans relire `real-bench.mjs` (04/11), qui coupait ligne par ligne. Relevé par la revue du 22/11 au soir (REVUE §3 bis).
 
 ---
 

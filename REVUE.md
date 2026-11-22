@@ -1,6 +1,6 @@
 # Dossier pour revue externe
 
-État complet de la recherche au **22/11/2026, 19 h 50**, rédigé pour qu'un relecteur qui n'a vu aucune session de travail puisse juger la méthode, les chiffres et les décisions. Tout ce qui suit est vérifiable dans ce dépôt, dans [journal.md](journal.md) ou dans la branche [`feat/lid-inference`](https://github.com/kilworks/kick-chat-translator/tree/feat/lid-inference) de l'extension.
+État complet de la recherche au **22/11/2026, 19 h 50**, corrigé le 22/11 au soir après une revue externe (coupe dev/heldout, unités de coût, chiffres incohérents) ; les nouvelles mesures citées viennent de `tools/lid/prefilter.mjs` et `tools/lid/review_checks.py` (branche `feat/lid-inference`), évaluation seule sur dev et sur le chat non étiqueté, heldout jamais lu. Dossier rédigé pour qu'un relecteur qui n'a vu aucune session de travail puisse juger la méthode, les chiffres et les décisions. Tout ce qui suit est vérifiable dans ce dépôt, dans [journal.md](journal.md) ou dans la branche [`feat/lid-inference`](https://github.com/kilworks/kick-chat-translator/tree/feat/lid-inference) de l'extension.
 
 Le raisonnement complet (d'où vient l'idée, options pesées, écarts au plan, erreurs) est dans [PROCESSUS.md](PROCESSUS.md).
 
@@ -12,7 +12,7 @@ Ce qui est **mesuré** est écrit au présent avec son chiffre. Ce qui est **sup
 
 [Kick Chat Translator](https://github.com/kilworks/kick-chat-translator) (Chrome, Firefox, Brave) traduit le chat de Kick dans la langue de chaque spectateur. Avant de traduire, l'extension doit savoir dans quelle langue est chaque ligne : pour la cacher si elle est déjà dans la langue du lecteur ou dans une langue qu'il a exclue, pour afficher un drapeau, et pour donner (ou non) la langue source au service de traduction.
 
-Le détecteur actuel (branche `master`, version 3.6.2) combine `franc-min`, des tables de mots et, quand le navigateur en a un, son détecteur (CLD sur Chrome et Firefox ; rien sur Brave). Il se trompe sur 24 % des phrases Tatoeba et 17 % des lignes de chat réel annotées.
+Le détecteur actuel (branche `master`, version 3.6.2) combine `franc-min`, des tables de mots et, quand le navigateur en a un, son détecteur (CLD sur Chrome et Firefox ; rien sur Brave). Il se trompe sur 17,7 % des phrases Tatoeba (4 150 bonnes réponses sur 5 040) et sur 17 % des lignes de chat réel annotées (121 sur 711) ; `franc` seul se trompe sur 24 % des phrases Tatoeba.
 
 ## 2. Contraintes fixées par le propriétaire du projet
 
@@ -36,12 +36,12 @@ Garde : aucun texte de dev ni de heldout n'entre à l'entraînement (exclusion a
 
 ## 3 bis. Comment dev et heldout ont été annotés
 
-- **Échantillon** : 2 000 lignes tirées des captures Kick du 04/11 (`test/e2e/real-bench.mjs sample`), sans la langue déclarée de la chaîne (l'annotateur ne voit que l'id et le texte).
+- **Échantillon** : 2 000 lignes tirées des captures 04a et 04b du 04/11 (`test/e2e/real-bench.mjs sample`), sans la langue déclarée de la chaîne (l'annotateur ne voit que l'id et le texte).
 - **Deux annotateurs indépendants, deux consignes différentes** : A « linguiste de terrain » (`consigne-a.md`), B « modérateur d'une équipe de traduction » (`consigne-b.md`). Mêmes champs : langue (40 codes, ou `neutral`, `mixed`, `other`), variante, argot, romanisé, alternance de langues, émotes seules, commande de bot, anglais de chat. Les consignes sont rédigées comme des instructions pour un modèle de langage ; **qui a annoté (humain ou modèle, lequel) reste à confirmer par le propriétaire**.
 - **Accord** (kappa de Cohen sur 2 000 lignes) : langue 0,96 (accord brut 96,35 %), variante 0,92, romanisé 0,92, anglais de chat 0,81, alternance 0,73, argot 0,71.
 - **Désaccords** : 478 lignes ont au moins un champ en désaccord (`disagreements.jsonl`). **Aucun n'a été tranché.** Un champ n'est retenu que si les deux annotateurs sont d'accord, sinon il vaut `null` et la ligne sort du coût.
-- **Coupe par capture** (jamais par ligne) : dev 1 007 lignes, heldout 993 (empreinte sha256 vérifiée).
-- **Composition de dev** : 711 lignes dans une seule langue (comptées au coût), 209 neutres, 49 « autre » (langue hors liste : serbe, mongol, malais...), 1 mélange, le reste `null` (désaccord). Les 296 lignes hors coût sont mesurées à part (§ analyses).
+- **Coupe ligne par ligne, pas par capture** : le script `test/e2e/real-bench.mjs` (commande `split`, une seule version, commit 3c098b8 du 04/11) mélange les lignes de chaque langue d'accord, puis les alterne une à une entre dev (1 007 lignes) et heldout (993, empreinte sha256 vérifiée). L'échantillon de 2 000 lignes ne vient que de deux fichiers de capture, 04a et 04b (dev : 526 et 481 lignes) ; heldout vient donc des mêmes fichiers, des mêmes chaînes et des mêmes conversations, lignes intercalées. Dev touche 257 des 279 couples fichier:chaîne de ces deux fichiers. Les fichiers 04c et 04d n'ont servi qu'aux lois a priori (E5, adaptation). Les ids de chaîne sont renumérotés dans chaque fichier de capture.
+- **Composition de dev** : 711 lignes dans une seule langue (comptées au coût), 209 neutres, 49 « autre » (langue hors liste : serbe, mongol...), 1 mélange, le reste `null` (désaccord). Le malais (`ms`) n'est pas hors liste : il figure dans la consigne d'annotation et parmi les 42 labels du modèle, et aucune ligne de dev n'est étiquetée `ms`. Si des lignes malaises figurent parmi les « autre », c'est un écart à la consigne, non vérifié. Les 296 lignes hors coût sont mesurées à part (§ analyses).
 - **Heldout n'est pas vierge** : jamais lu ligne à ligne, mais ses totaux ont été calculés pour le détecteur `master` le 04/11 (base : sûr 359 justes, 338 silences, 3 fausses sur 700 lignes à langue d'accord ; brut 428 / 156 / 116), puis le 05/11 une dizaine de fois pour accepter ou refuser des règles de `master` (trois règles refusées sur un écart d'une ligne dans heldout). Rien de cette recherche ne l'a encore touché, mais `master`, la base de comparaison, a été en partie réglée dessus.
 
 ## 4. Fonction de coût (fixée avant toute mesure)
@@ -56,10 +56,14 @@ Garde : aucun texte de dev ni de heldout n'entre à l'entraînement (exclusion a
 
 La spécification prévoyait aussi un coût de 4 pour une mauvaise langue source imposée au moteur sur l'appareil. Le simulateur (`cost.py`) ne l'applique pas : le mode par défaut de l'extension est « cloud d'abord » depuis la 3.5.0, ce cas n'arrive donc pas avec les réglages simulés. Le coût 1 de la ligne gardée hors liste blanche ne concerne que le lecteur à liste blanche.
 
+Ce terme « ligne gardée hors liste blanche » (1) n'est pas dans la spécification ; il figure dans `cost.py` dès son premier commit (4d38853, 22/11 16 h 44) ; le dépôt ne permet pas de dater son ajout par rapport aux premières mesures.
+
 Coût moyenné par ligne et rapporté sur 3 chemins : aucun détecteur (Brave), Chrome, Firefox.
 **Contrainte dure** : le nombre de messages cachés à tort ne doit monter pour **aucun** lecteur (langue du lecteur × langues exclues) ni pour **aucun** chemin. Les seuils (détection, envoi de la langue source) sont choisis pour minimiser le coût sous cette contrainte.
 
 **Hypothèse non vérifiée** : le poids 0,5 du silence suppose que donner la langue source au cloud améliore la traduction. Pas mesuré sur de vraies traductions (voir §9).
+
+Mesuré depuis (`review_checks.py`, partie A), en refaisant le choix des seuils sur dev avec un silence gratuit (poids 0) : `master` → modèle seul → modèle adapté (accrom-b16) : sans détecteur 0,310 → 0,157 → 0,120 ; Chrome 0,219 → 0,187 → 0,145 ; Firefox 0,204 → 0,198 → 0,162. Le silence pèse 0,221 des 0,531 de `master` sans détecteur (42 %). Le gain ne dépend donc pas tout entier du 0,5 : sans adaptation il disparaît presque sur Firefox ; avec l'adaptation il reste net sur les trois chemins (sur dev, donc optimiste). L'hypothèse reste à mesurer sur de vraies traductions.
 
 ## 5. Modèle
 
@@ -71,23 +75,25 @@ Coût moyenné par ligne et rapporté sur 3 chemins : aucun détecteur (Brave), 
 
 ## 6. Résultats (dev ; optimistes par construction)
 
-Coût moyen par ligne, chemin sans détecteur (Brave), `master` = **0,531**.
+Coût moyen par ligne, moyenne des 3 chemins (Brave, Chrome, Firefox), `master` = **0,465** (Brave seul : 0,531 ; valeurs par chemin au §10 bis).
 
 | Modèle | Coût seul | Coût adapté (causal, k=10) | dev | banc Tatoeba |
 |---|:---:|:---:|:---:|:---:|
-| base-b15 (E3) | 0,329 | | 85,1 % | 97,9 % |
-| base-b16 (E1b) | 0,318 | 0,251 (non causal) | 85,2 % | 98,2 % |
+| base-b15 (E3) | 0,342 | | 85,1 % | 97,9 % |
+| base-b16 (E1b) | 0,326 | 0,251 (non causal) | 85,2 % | 98,2 % |
 | **accrom-b16** (E8, référence actuelle) | 0,306 | 0,210 | 87,8 % | 98,17 % |
 | st1-b16 (E9a, Kick + Twitch pseudo) | 0,284 | **0,189** | 89,3 % | 98,06 % |
 | st-twitch-b16 (E9b, Twitch seul) | 0,275 | 0,200 | 89,2 % | 98,5 % |
 | st-kick-b16 (E9b, Kick seul) | 0,331 | 0,234 | 88,7 % | |
 | nn-b16-d32-h128 (E7, réseau) | 0,410 | | 83,3 % | 98,3 % |
 
+Toutes les valeurs sont des moyennes sur les 3 chemins ; une première version donnait base-b15 et base-b16 sur Brave seul (0,329 et 0,318).
+
 Autres mesures clés :
-- E3 : réponses fausses sans détecteur 121 → 23 sur 711 (107 corrigées, 9 cassées, McNemar χ² = 81) ; IC95 du gain de coût [-0,213 ; -0,192].
-- E3b : sur Chrome et Firefox, presque tout le gain vient de l'envoi de la langue source (`sl`), d'où l'importance de l'hypothèse du §4.
-- E6c : adaptation **causale** par vraie chaîne (seules les lignes captées avant la ligne jugée comptent), 515 chaînes, médiane 22 lignes : 0,306 → 0,210 ; Chrome 0,205, Firefox 0,222 ; langues sources fausses 15 → 11.
-- E9b (contrôle de fuite) : dev vient de captures Kick, Twitch ne partage aucune chaîne avec lui. Twitch seul fait **mieux** que le mélange : le gain de l'auto-apprentissage n'est pas une fuite. Les pseudo-lignes Kick **nuisent** (0,331) : les chaînes « English (India) » écrivent en hinglish, étiqueté anglais ; filtre corrigé depuis (112 des 381 lignes Kick « en » retirées).
+- E3 : réponses fausses sans détecteur 121 → 23 sur 711 (107 corrigées, 9 cassées, McNemar χ² = 81) (intervalle d'une première version retiré : bootstrap sur 2 fichiers de capture, sans valeur ; intervalles par chaîne au §10 bis).
+- E3b (base-b15, sans adaptation ; voir §4) : sur Chrome et Firefox, presque tout le gain vient de l'envoi de la langue source (`sl`), d'où l'importance de l'hypothèse du §4.
+- E6c : adaptation **causale** par vraie chaîne (seules les lignes captées avant la ligne jugée comptent), 515 couples fichier:chaîne des 4 captures ayant au moins une ligne sûre (les lignes de dev en touchent 232), médiane 22 lignes : 0,306 → 0,210 ; Chrome 0,205, Firefox 0,222 ; langues sources fausses 15 → 11.
+- E9b (contrôle de fuite) : dev vient de captures Kick, Twitch ne partage aucune chaîne avec lui. Twitch seul fait **mieux** que le mélange : le gain de l'auto-apprentissage n'est pas une fuite. Les pseudo-lignes Kick **nuisent** (0,331) : les chaînes « English (India) » écrivent en hinglish, étiqueté anglais ; filtre corrigé depuis (112 des 381 lignes Kick « en » retirées). Mesuré depuis : aucune des 93 791 lignes Twitch déclarées `en` du pool E9b ne contient deux marqueurs de hindi romanisé (témoin : 12 % des lignes Kick « English (India) », que le modèle lit surtout `hi`) ; à refaire sur la collecte complète.
 
 Analyse d'erreurs (st1-b16 vs accrom-b16, dev) : anglais de chat 76 → 84 %, argot 80 → 82 %, lignes de 2 mots ou moins 83 → 85 %, **mélange de langues 69 % et romanisé 57 % inchangés** ; hindi romanisé lu comme anglais 8 fois sur 23 ; persan romanisé (finglish) jamais vu à l'entraînement.
 
@@ -119,7 +125,8 @@ Méthode : voir le protocole à la fin de [journal.md](journal.md). Points saill
 3. **Auto-apprentissage = le modèle apprend ses propres certitudes** : il renforce ce qu'il sait déjà ; il ne peut pas apprendre seul le romanisé ou le mélange (constaté : inchangés).
 4. **Gros streams surreprésentés**, une seule fenêtre horaire (fuseaux), quelques langues très minces (hr 23 lignes, lv 81).
 5. **Kick sous-représenté dans la collecte récente** (IP limitée), alors que l'extension sert Kick. Twitch seul a pourtant donné le meilleur coût seul (E9b).
-6. **Simulation de l'adaptation** sur les captures de dev (515 chaînes, médiane 22 lignes) : l'extension en direct voit des chaînes plus longues, ce qui devrait aider, mais ce n'est pas mesuré.
+6. **Simulation de l'adaptation** sur les captures de dev (515 couples fichier:chaîne des 4 captures ayant au moins une ligne sûre, médiane 22 lignes) : l'extension en direct voit des chaînes plus longues. Mesuré depuis : sur le chat non étiqueté (pool E9b, 313 989 lignes, 2 050 couples fichier:chaîne, accrom-b16, k = 10, `review_checks.py` partie B), la part des lignes qui reçoivent une langue source contraire au choix du modèle seul passe de 0,09 % (moins de 10 lignes sûres vues avant dans la chaîne) à 1,76 % (10 à 50, le cas de dev), 3,65 % (50 à 200), 5,20 % (200 à 1 000) et 7,17 % (plus de 1 000) ; les lignes dont le modèle seul était sûr (p ≥ 0,9, justes à 98,4 % sur dev) sont retournées dans 0,16 % puis 1,24 % des cas. Une chaîne longue n'aide donc pas d'elle-même : la loi a priori pèse de plus en plus. Juste ou faux n'est pas mesurable sans étiquettes ; à trancher avant le portage (fenêtre glissante, plancher, adaptation tenue hors de `sl`).
+7. **heldout n'est pas indépendant de dev** : mêmes fichiers de capture, mêmes chaînes, mêmes conversations, lignes intercalées (§3 bis). Il juge la comparaison avec `master`, pas la généralisation à d'autres chaînes ou à un autre jour ; une affirmation générale demande un jeu tiré d'une autre date.
 
 ## 9. Pas encore fait
 
@@ -138,8 +145,8 @@ Méthode : voir le protocole à la fin de [journal.md](journal.md). Points saill
 4. Romanisé et mélange de langues stagnent : données synthétiques plus riches, classe « mélange » explicite, ou laisser ces lignes au silence ?
 5. Le réseau (E7) perd au coût parce qu'il est trop sûr de lui : une calibration plus forte ou un mélange linéaire + réseau mérite-t-il un essai, ou le linéaire suffit-il ?
 6. Le contrôle de fuite E9b (Twitch seul) est-il suffisant pour écarter un biais de chaînes communes avec dev ?
-7. Avec l'adaptation, le modèle envoie une langue source au cloud pour 145 lignes neutres sur 209, que le coût ne compte pas (§10 bis) : faut-il les compter, ou interdire `sl` sans lettre significative ?
-8. Heldout a déjà servi à régler le détecteur de base (`master`) : reste-t-il un juge acceptable pour la comparaison finale, ou faut-il annoter un nouveau jeu ?
+7. Avec l'adaptation, le modèle envoie une langue source au cloud pour 145 lignes neutres sur 209, que le coût ne compte pas (§10 bis) : faut-il les compter, ou interdire `sl` sans lettre significative ? (voir §10 bis : 7 lignes dans le vrai pipeline)
+8. Heldout a déjà servi à régler le détecteur de base (`master`) : reste-t-il un juge acceptable pour la comparaison finale, ou faut-il annoter un nouveau jeu ? (voir §3 bis : coupe ligne par ligne)
 
 ## 10 bis. Analyses complémentaires du 22/11 (évaluation seule, aucun entraînement)
 
@@ -147,7 +154,7 @@ Produites par `tools/lid/report.py` et `tools/lid/ft_bench.py` (branche `feat/li
 
 ### Intervalles de confiance : le bootstrap de `cost.py` était trop optimiste
 
-`cost.py` rééchantillonnait par fichier de capture. Dev n'en contient que **2** : ses intervalles ne valaient rien. Refaits ici en rééchantillonnant les **232 vraies chaînes** de dev (bootstrap apparié, 2 000 tirages).
+`cost.py` rééchantillonnait par fichier de capture. Dev n'en contient que **2** : ses intervalles ne valaient rien. Refaits ici en rééchantillonnant les **232 couples fichier:chaîne** de dev (les ids étant renumérotés par fichier, une même chaîne présente dans 04a et 04b compte deux fois, ce qu'on ne peut pas vérifier) (bootstrap apparié, 2 000 tirages).
 
 | Comparaison (coût par ligne, chemin sans détecteur) | Écart | IC 95 % par chaîne |
 |---|---|---|
@@ -217,10 +224,12 @@ Les réponses fausses sont rares et dispersées (11 sur 711 ; la plus fréquente
 | Neutres : réponse donnée | 47 / 209 | 147 / 209 |
 | Neutres : langue source envoyée au cloud | 4 | **145** |
 | Neutres : réponse dans une langue de lecteur (cachées pour ce lecteur) | 38 | 10 |
-| « Autre » (serbe, mongol, malais...) : réponse donnée | 25 / 49 | 12 / 49 |
+| « Autre » (serbe, mongol...) : réponse donnée | 25 / 49 | 12 / 49 |
 | « Autre » : réponse dans une langue de lecteur | 9 | 4 |
 
 Deux lectures. En bien : le modèle cache moins de lignes neutres et de langues hors liste. **En mal : avec l'adaptation, il envoie une langue source au cloud pour 145 lignes neutres** (« gg », « lol », émotes : la loi a priori de la chaîne les pousse au-dessus du seuil). Le coût est nul par construction sur ces lignes ; l'effet réel sur la traduction n'est pas mesuré. À corriger probablement par une règle « pas de `sl` sans lettre significative », ou à compter dans le coût.
+
+Mesuré depuis (`prefilter.mjs`) : le vrai pipeline (`pipeline.ts`, avant la détection) écarte les lignes trop courtes, le bruit, l'argot seul et les commandes ; 49 des 209 neutres atteignent la détection, et 7 seulement des 145 ; dans l'extension le problème porte sur 7 lignes. Sur les 711 lignes du coût, 697 atteignent la détection ; recalculé sur elles, le coût adapté sans détecteur passe de 0,203 à 0,196 (`master` 0,532).
 
 ### Base de comparaison forte : fastText lid.176
 
@@ -289,6 +298,7 @@ La date de l'export Tatoeba n'a pas été notée au premier téléchargement (le
 | Coût, seuils, adaptation | `cost.py`, `adapt.py` (`--causal`), `prior.py`, `answers.mjs` |
 | Collecte et auto-apprentissage | `kick_capture.mjs`, `twitch_irc.py`, `remote_collect.py`, `pool.mjs`, `pseudo.py`, `captures.mjs` |
 | Suivi | `watch_collect.py` sur [tui-dash](https://github.com/kilworks/tui-dash) |
+| Vérifications de la revue | `review_checks.py`, `prefilter.mjs` |
 | Page de démo et ses données | [`docs/`](docs) de ce dépôt (`viz_export.py`) |
 
 ## 12. Erreurs commises en route (et corrigées)
@@ -297,3 +307,5 @@ La date de l'export Tatoeba n'a pas été notée au premier téléchargement (le
 - **E6** : l'adaptation était simulée par langue déclarée (plusieurs chaînes mélangées) et annonçait 0,214 ; refaite par vraie chaîne (E6b), puis en causal (E6c, 0,210).
 - **Collecte Kick** : intervalle trop court et trop de chaînes à la fois, IP limitée par Kick ; repli automatique ajouté après coup.
 - **Annuaire Twitch** : le premier relevé utilisait un mauvais filtre et un tri « recommandé », d'où des petites chaînes ; refait par case de langue et tri par spectateurs.
+- **Coupe dev/heldout** annoncée par capture alors que le script coupait ligne par ligne (§3 bis).
+- **Unités mélangées** dans le tableau du §6 (Brave seul et moyenne des 3 chemins).
