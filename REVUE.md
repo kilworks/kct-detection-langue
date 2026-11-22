@@ -2,6 +2,8 @@
 
 État complet de la recherche au **22/11/2026, 19 h 50**, rédigé pour qu'un relecteur qui n'a vu aucune session de travail puisse juger la méthode, les chiffres et les décisions. Tout ce qui suit est vérifiable dans ce dépôt, dans [journal.md](journal.md) ou dans la branche [`feat/lid-inference`](https://github.com/kilworks/kick-chat-translator/tree/feat/lid-inference) de l'extension.
 
+Le raisonnement complet (d'où vient l'idée, options pesées, écarts au plan, erreurs) est dans [PROCESSUS.md](PROCESSUS.md).
+
 Ce qui est **mesuré** est écrit au présent avec son chiffre. Ce qui est **supposé** est marqué hypothèse. Ce qui **n'est pas fait** est dans « Pas encore fait ».
 
 ---
@@ -38,6 +40,7 @@ Garde : aucun texte de dev ni de heldout n'entre à l'entraînement (exclusion a
 |---|:---:|
 | Message caché à tort | 10 |
 | Mauvaise langue source envoyée au cloud | 5 |
+| Mauvaise langue source imposée au moteur sur l'appareil | 4 |
 | Mauvais drapeau | 1 |
 | Silence (le cloud détecte seul) | 0,5 |
 
