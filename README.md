@@ -28,13 +28,16 @@ Coût moyen par ligne de chat (plus bas = mieux) :
 
 | Chemin | Avant (master) | Modèle seul | Modèle + adaptation par chaîne |
 |---|---|---|---|
-| Sans détecteur du navigateur (Brave) | 0,531 | 0,318 | 0,214 |
-| Chrome | 0,439 | 0,321 | 0,214 |
-| Firefox | 0,424 | 0,339 | 0,236 |
+| Sans détecteur du navigateur (Brave) | 0,531 | 0,296 | 0,200 |
+| Chrome | 0,439 | 0,301 | 0,203 |
+| Firefox | 0,424 | 0,320 | 0,223 |
+
+Modèle : `accrom-b16` (2^16 cases, variantes sans accents et hindi/bengali romanisés).
 
 - Sans détecteur du navigateur, les réponses fausses passent de 121 à 23 sur 711 lignes (107 corrigées, 9 cassées, test de McNemar χ² = 81).
 - Sur le banc Tatoeba, la chaîne de détection trouve la bonne langue 98 % du temps, contre 82 % avant.
-- **Adaptation par chaîne** : l'extension compte les langues dont elle est sûre dans le chat de la chaîne en cours et ajuste ses probabilités pour cette chaîne. Simulée sans jamais voir la ligne jugée ni son étiquette, elle aide dès 10 lignes (0,281) et plafonne vers 100 lignes (0,225). Elle réduit aussi les langues sources fausses (15 contre 9).
+- **Adaptation par chaîne** : l'extension compterait les langues dont elle est sûre dans le chat de la chaîne en cours et ajusterait ses probabilités pour cette chaîne. Simulée sur 515 vraies chaînes (médiane 22 lignes chacune), sans jamais voir la ligne jugée ni son étiquette : coût 0,306 vers 0,209, langues sources fausses 15 vers 10. Limites : la simulation compte aussi les lignes postérieures de la chaîne, et son paramètre k a été choisi sur dev.
+- **Correction** : une première version regroupait les lignes par langue déclarée de la chaîne (plusieurs chaînes mélangées) et annonçait 0,214 ; ce n'était pas ce que l'extension verrait.
 
 ## Ce qui n'a pas marché
 
@@ -46,7 +49,7 @@ Le détail de chaque expérience est dans [journal.md](journal.md).
 
 ## Suite
 
-1. Variantes sans accents et romanisées : mesure en cours.
+1. Collecte de chat Kick à grande échelle (non étiqueté) pour l'auto-apprentissage et une simulation causale de l'adaptation.
 2. Mesurer sur de vraies traductions si donner la langue source au cloud améliore le résultat (le poids 0,5 du silence est une hypothèse).
 3. Porter l'adaptation par chaîne dans l'extension, puis lecture unique de heldout.
 4. Gemini Nano (Chrome) en arbitre des lignes ambiguës, seulement s'il reste un écart chiffré.
