@@ -1,64 +1,143 @@
-# Détection de langue par inférence pour Kick Chat Translator
+<!-- EBAUCHE : les blocs marques A VENIR attendent la fin de la collecte (E9) et la lecture unique de heldout. -->
 
-Recherche en cours pour remplacer la détection de langue heuristique de l'extension [Kick Chat Translator](https://github.com/kilworks/kick-chat-translator) par un modèle entraîné, livré dans l'extension et exécuté chez chaque utilisateur (Chrome, Firefox, Brave), sans service externe.
+<div align="center">
 
-Démo en direct et graphiques : https://kilworks.github.io/kct-detection-langue/ (le modèle tourne dans la page, tapez une phrase).
+# Détection de langue par inférence
+
+**Un modèle entraîné, livré dans l'extension [Kick Chat Translator](https://github.com/kilworks/kick-chat-translator), qui devine la langue de chaque message du chat, chez l'utilisateur, sans service externe.**
+
+[![Statut](https://img.shields.io/badge/statut-recherche_en_cours-0b6e5c)](journal.md)
+[![Démo](https://img.shields.io/badge/d%C3%A9mo-dans_le_navigateur-3fd0ae)](https://kilworks.github.io/kct-detection-langue/)
+[![Langues](https://img.shields.io/badge/langues-42-1f6fb0)](#la-méthode)
+[![Navigateurs](https://img.shields.io/badge/Chrome_%C2%B7_Firefox_%C2%B7_Brave-sur_l'appareil-6d4fb3)](#le-problème)
+[![Inférence](https://img.shields.io/badge/inf%C3%A9rence-%3C_1_ms_par_ligne-c4561a)](#la-méthode)
+[![Licence](https://img.shields.io/badge/licence-MIT-8a6d1f)](LICENSE)
+
+**[Essayer la démo](https://kilworks.github.io/kct-detection-langue/)** · [Journal des expériences](journal.md) · [Code](https://github.com/kilworks/kick-chat-translator/tree/feat/lid-inference)
+
+</div>
+
+---
+
+## En bref
+
+| | Avant (master) | Modèle seul | Modèle + adaptation par chaîne |
+|---|:---:|:---:|:---:|
+| **Coût moyen par ligne** (Brave, plus bas = mieux) | 0,531 | 0,296 | **0,200** |
+| **Réponses fausses** sur 711 lignes de chat | 121 | 23 | *A VENIR* |
+| **Banc Tatoeba**, bonne langue trouvée | 82 % | 98 % | 98 % |
+
+> Chiffres sur le jeu **dev** : ils ont servi à choisir le modèle, ils sont donc optimistes. Le jeu **heldout** (993 lignes) ne sera lu qu'une fois, à la fin.
+
+---
 
 ## Le problème
 
-L'extension doit savoir dans quelle langue est écrit chaque message du chat avant de le traduire. Une erreur coûte cher :
+L'extension doit connaître la langue de chaque message **avant** de le traduire. Une erreur se paie de deux façons :
 
-- elle peut **cacher un message** au lecteur (l'extension croit qu'il est déjà dans sa langue, ou qu'il vient d'une langue qu'il a exclue) ;
-- elle peut **envoyer une mauvaise langue source** au moteur de traduction, qui rend alors du charabia ou le texte inchangé.
+| Erreur | Ce que voit le lecteur | Coût |
+|---|---|:---:|
+| Message caché à tort | un message disparaît (« déjà dans ta langue ») | **10** |
+| Mauvaise langue source envoyée au cloud | une traduction absurde ou le texte inchangé | **5** |
+| Mauvais drapeau | une étiquette fausse à côté du message | **1** |
+| Silence | le cloud détecte la langue seul | **0,5** |
 
-Le détecteur actuel (`franc-min` et des tables de mots) se trompe sur 24 % des phrases du banc Tatoeba, et sur 17 % des lignes de chat réel annotées.
+Ces coûts ont été fixés **avant** toute mesure. Les seuils du modèle minimisent ce coût sous une contrainte stricte : **aucune hausse des messages cachés à tort, pour aucun lecteur et aucun navigateur.**
+
+Le détecteur actuel (`franc-min` et des tables de mots) se trompe sur 24 % des phrases Tatoeba et sur 17 % des lignes de chat réel annotées.
+
+---
 
 ## La méthode
 
-- **Modèle** : classifieur linéaire sur des n-grammes de caractères (1 à 4) et des mots, hachés dans 2^15 ou 2^16 cases (même famille que fastText). Poids quantifiés en int8, probabilités calibrées par une température. Inférence en TypeScript pur, sans dépendance, moins d'une milliseconde par ligne.
-- **Données d'entraînement** : Tatoeba (42 langues, CC BY 2.0 FR), augmenté vers le registre du chat (minuscules, sans ponctuation, fenêtres de 1 à 4 mots, variantes sans accents, hindi et bengali romanisés synthétiques). Aucune ligne évaluée n'est vue à l'entraînement, un test le vérifie.
-- **Évaluation** : 711 lignes de chat Kick réel annotées par langue (jeu « dev »), plus 993 lignes gardées de côté (« heldout ») qui ne seront lues qu'une fois, à la fin. Ces lignes viennent d'utilisateurs de Kick : elles ne sont pas publiées ici, seuls les agrégats le sont.
-- **Coût d'erreur**, fixé avant toute mesure : message caché à tort 10, mauvaise langue source envoyée au cloud 5, drapeau faux 1, silence (le cloud détecte seul) 0,5. Les seuils du modèle minimisent ce coût sous une contrainte : aucune hausse des messages cachés à tort, pour aucun lecteur.
+```mermaid
+flowchart LR
+    A[Ligne de chat] --> B[Nettoyage<br/>emotes, mentions]
+    B --> C[n-grammes de caractères 1 à 4<br/>+ mots, hachés]
+    C --> D[Classifieur linéaire<br/>int8, température]
+    D --> E{Adaptation<br/>par chaîne}
+    E --> F[Langue + confiance]
+    F --> G{Seuils au coût}
+    G -->|sûr| H[Drapeau / masquage]
+    G -->|doute| I[Silence : le cloud décide]
+```
 
-## Résultats provisoires (dev, pas encore heldout)
+| Étape | Choix |
+|---|---|
+| **Modèle** | linéaire sur n-grammes hachés dans 2^15 ou 2^16 cases (famille fastText), poids int8, 1,5 à 2,9 Mo, TypeScript pur, aucune dépendance |
+| **Entraînement** | Tatoeba (42 langues), augmenté vers le registre du chat : minuscules, sans ponctuation, fenêtres de 1 à 4 mots, sans accents, hindi et bengali romanisés |
+| **Auto-apprentissage** | chat Kick et Twitch non étiqueté, pseudo-étiquettes sûres (p ≥ 0,9 et langue déclarée de la chaîne d'accord) |
+| **Adaptation par chaîne** | l'extension compte les langues dont elle est sûre dans la chaîne en cours et ajuste ses probabilités, sans jamais voir la ligne jugée |
+| **Évaluation** | 711 lignes Kick annotées (dev) + 993 gardées de côté (heldout), jamais publiées, seuls les agrégats le sont |
 
-Ces chiffres servent à choisir le modèle et ses seuils : ils sont donc optimistes. Seul heldout tranchera.
+---
 
-Coût moyen par ligne de chat (plus bas = mieux) :
+## Résultats provisoires
 
-| Chemin | Avant (master) | Modèle seul | Modèle + adaptation par chaîne |
-|---|---|---|---|
-| Sans détecteur du navigateur (Brave) | 0,531 | 0,296 | 0,200 |
-| Chrome | 0,439 | 0,301 | 0,203 |
-| Firefox | 0,424 | 0,320 | 0,223 |
+### Coût moyen par ligne, par navigateur
 
-Modèle : `accrom-b16` (2^16 cases, variantes sans accents et hindi/bengali romanisés).
+| Chemin | Avant | Modèle seul | + adaptation |
+|---|:---:|:---:|:---:|
+| Sans détecteur du navigateur (Brave) | 0,531 | 0,296 | **0,200** |
+| Chrome | 0,439 | 0,301 | **0,203** |
+| Firefox | 0,424 | 0,320 | **0,223** |
 
-- Sans détecteur du navigateur, les réponses fausses passent de 121 à 23 sur 711 lignes (107 corrigées, 9 cassées, test de McNemar χ² = 81).
-- Sur le banc Tatoeba, la chaîne de détection trouve la bonne langue 98 % du temps, contre 82 % avant.
-- **Adaptation par chaîne** : l'extension compterait les langues dont elle est sûre dans le chat de la chaîne en cours et ajusterait ses probabilités pour cette chaîne. Simulée sur 515 vraies chaînes (médiane 22 lignes chacune), sans jamais voir la ligne jugée ni son étiquette : coût 0,306 vers 0,209, langues sources fausses 15 vers 10. Limites : la simulation compte aussi les lignes postérieures de la chaîne, et son paramètre k a été choisi sur dev.
-- **Correction** : une première version regroupait les lignes par langue déclarée de la chaîne (plusieurs chaînes mélangées) et annonçait 0,214 ; ce n'était pas ce que l'extension verrait.
+```mermaid
+xychart-beta
+    title "Coût moyen par ligne (Brave, plus bas = mieux)"
+    x-axis ["Avant", "Modèle seul", "+ adaptation"]
+    y-axis "coût" 0 --> 0.6
+    bar [0.531, 0.296, 0.200]
+```
+
+- **Sans détecteur du navigateur**, les réponses fausses passent de 121 à 23 sur 711 lignes (107 corrigées, 9 cassées, McNemar χ² = 81).
+- **Adaptation par chaîne**, simulée sur 515 vraies chaînes (médiane 22 lignes) : coût 0,306 → 0,209, langues sources fausses 15 → 10.
+
+### Auto-apprentissage sur le chat collecté (E9)
+
+> *A VENIR* : collecte en cours sur plusieurs machines (PC, serveur, VM), Kick et Twitch, 45 langues déclarées. Les modèles seront réentraînés sur la collecte complète, et le meilleur sera retenu sous la contrainte des messages cachés.
+
+| Modèle | Pseudo-lignes | Coût seul | Coût adapté |
+|---|:---:|:---:|:---:|
+| accrom-b16 (référence) | 0 | 0,306 | 0,210 |
+| Twitch seul (contrôle de fuite) | *A VENIR* | *A VENIR* | *A VENIR* |
+| Kick filtré | *A VENIR* | *A VENIR* | *A VENIR* |
+| Kick + Twitch | *A VENIR* | *A VENIR* | *A VENIR* |
+
+### Lecture unique de heldout
+
+> *A VENIR*
+
+---
 
 ## Ce qui n'a pas marché
 
-- **Réseau de neurones** (façon CLD3 : embeddings de n-grammes, couche cachée ReLU) : même précision que le linéaire sur Tatoeba (98,3 %), mais moins bon sur le chat (coût 0,410 contre 0,326), car il se trompe plus souvent avec assurance. Le linéaire reste en tête.
-- **Fréquence globale des langues sur Kick** (EM de Saerens sur le chat non étiqueté) : instable sur les langues rares, et la fréquence apprise est celle des chaînes capturées, pas de Kick. Rejeté au profit de l'adaptation par chaîne.
-- **Un premier chiffre faux, corrigé** : le banc tournait sans modèle installé et mesurait en partie franc. Une garde refuse maintenant de mesurer sans modèle.
+| Piste | Résultat | Pourquoi rejetée |
+|---|---|---|
+| Réseau de neurones (façon CLD3) | 98,3 % sur Tatoeba, coût chat 0,410 | se trompe plus souvent avec assurance |
+| Fréquence globale des langues (EM de Saerens) | instable sur les langues rares | apprend les chaînes capturées, pas Kick |
+| Premier banc | chiffre faux, corrigé | tournait sans modèle installé, une garde l'empêche maintenant |
+| Adaptation par langue déclarée | 0,214 annoncé, corrigé | mélangeait plusieurs chaînes, pas ce que l'extension verrait |
 
 Le détail de chaque expérience est dans [journal.md](journal.md).
 
+---
+
 ## Suite
 
-1. Collecte de chat Kick à grande échelle (non étiqueté) pour l'auto-apprentissage et une simulation causale de l'adaptation.
-2. Mesurer sur de vraies traductions si donner la langue source au cloud améliore le résultat (le poids 0,5 du silence est une hypothèse).
-3. Porter l'adaptation par chaîne dans l'extension, puis lecture unique de heldout.
-4. Gemini Nano (Chrome) en arbitre des lignes ambiguës, seulement s'il reste un écart chiffré.
+- [x] Modèle linéaire, seuils au coût, adaptation par chaîne simulée
+- [ ] Collecte de chat à grande échelle et auto-apprentissage (E9) *en cours*
+- [ ] Mesurer sur de vraies traductions si la langue source aide le cloud (le 0,5 du silence est une hypothèse)
+- [ ] Porter l'adaptation par chaîne dans l'extension, puis lecture unique de heldout
+- [ ] Gemini Nano (Chrome) en arbitre des lignes ambiguës, seulement s'il reste un écart chiffré
 
-## Code
+---
 
-Le code vit dans la branche [`feat/lid-inference`](https://github.com/kilworks/kick-chat-translator/tree/feat/lid-inference) de l'extension : inférence dans `src/content/lid/`, entraînement et bancs dans `tools/lid/` (numpy, Node). Spécification et plan : `docs/superpowers/` de la même branche.
+## Code et outils
 
-La collecte de chat (Kick et Twitch, plusieurs machines en parallèle) se suit dans un tableau de bord en console publié à part : [tui-dash](https://github.com/kilworks/tui-dash).
+- **Inférence** : [`src/content/lid/`](https://github.com/kilworks/kick-chat-translator/tree/feat/lid-inference/src/content/lid) de l'extension, branche `feat/lid-inference`.
+- **Entraînement et bancs** : [`tools/lid/`](https://github.com/kilworks/kick-chat-translator/tree/feat/lid-inference/tools/lid) (numpy, Node).
+- **Suivi de la collecte** : [tui-dash](https://github.com/kilworks/tui-dash), tableau de bord en console publié à part.
 
 ## Licences
 
