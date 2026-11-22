@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>Détecteur de langue KCT</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#f4f5f2;--panel:#ffffff;--ink:#16181a;--ink2:#4b5258;--line:#d5d8d2;--grid:#e6e8e3;
+  --accent:#0b6e5c;--accent-soft:#d6ece6;--master:#8a6d1f;--model:#0b6e5c;--bad:#b3341f;
+  --p-none:#6d4fb3;--p-chrome:#c4561a;--p-firefox:#1f6fb0;
+  --font:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1210;--panel:#171b19;--ink:#e6eae6;--ink2:#9aa49d;--line:#2c332f;--grid:#222825;
+  --accent:#3fd0ae;--accent-soft:#143a31;--master:#d9b44a;--model:#3fd0ae;--bad:#ff7a61;
+  --p-none:#a58df0;--p-chrome:#ff9a5c;--p-firefox:#6cb4f0;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1210;--panel:#171b19;--ink:#e6eae6;--ink2:#9aa49d;--line:#2c332f;--grid:#222825;
+  --accent:#3fd0ae;--accent-soft:#143a31;--master:#d9b44a;--model:#3fd0ae;--bad:#ff7a61;
+  --p-none:#a58df0;--p-chrome:#ff9a5c;--p-firefox:#6cb4f0;color-scheme:dark}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--font);font-variant-numeric:tabular-nums}
+.wrap{max-width:1040px;margin:0 auto;padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1{font-size:26px;line-height:1.15;margin:0 0 6px;letter-spacing:-.01em}
+h2{font:500 13px/1.2 var(--mono);text-transform:uppercase;letter-spacing:.08em;margin:0 0 4px;color:var(--accent)}
+.sub{color:var(--ink2);margin:0 0 8px;max-width:68ch}
+.lede{color:var(--ink2);margin:0 0 20px;max-width:70ch}
+section{border-top:1px solid var(--line);padding-block:26px 8px;margin-top:22px}
+.mono{font-family:var(--mono)}
+.n{font-family:var(--mono);font-variant-numeric:tabular-nums}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.demo{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--accent);padding:18px;border-radius:2px}
+.demo input{width:100%;font:18px var(--mono);padding:10px 12px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:2px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 14px}
+.chip{font:13px var(--font);padding:5px 10px;background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:999px;cursor:pointer}
+.chip:hover{border-color:var(--accent);background:var(--accent-soft)}
+.meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:6px 20px;font-size:13px;color:var(--ink2);margin:12px 0}
+.meta b{display:block;font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--ink2)}
+.meta span.v{color:var(--ink);font-family:var(--mono);word-break:break-all}
+.bars{display:grid;gap:5px}
+.bar{display:grid;grid-template-columns:44px 1fr 58px;gap:8px;align-items:center;font:13px var(--mono)}
+.bar .t{height:16px;background:var(--grid);position:relative}
+.bar .f{position:absolute;inset:0 auto 0 0;background:var(--ink2);opacity:.55;transition:width .15s}
+.bar.top .f{background:var(--accent);opacity:1}
+.bar .p{text-align:right}
+@media (prefers-reduced-motion:reduce){.bar .f{transition:none}}
+.verdict{margin-top:12px;padding:8px 12px;font-weight:600;border:1px solid var(--line)}
+.verdict.ok{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.verdict.no{border-color:var(--bad);color:var(--bad)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0;border:1px solid var(--line);background:var(--panel)}
+.kpi{padding:14px 16px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);margin:0 -1px -1px 0}
+.kpi .l{font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--ink2)}
+.kpi .big{font:500 28px/1.2 var(--mono);color:var(--accent)}
+.kpi .s{font-size:13px;color:var(--ink2)}
+.scroll{overflow-x:auto;max-width:100%}
+.scroll svg{display:block}
+svg text{font-family:var(--mono);fill:var(--ink2)}
+.svgmin{min-width:640px}
+table{border-collapse:collapse;width:100%;font-size:13px;background:var(--panel)}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--ink2)}
+td.num{text-align:right;font-family:var(--mono)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:620px){.two{grid-template-columns:1fr}}
+.cap{font-size:12px;color:var(--ink2);margin:6px 0 0}
+.legend{display:flex;flex-wrap:wrap;gap:3px;margin-top:10px}
+.legend button{font:12px var(--mono);border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:2px 6px;cursor:pointer;display:inline-flex;gap:5px;align-items:center}
+.legend button[aria-pressed="true"]{border-color:var(--ink);background:var(--grid)}
+.legend i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.mapbox{position:relative;background:var(--panel);border:1px solid var(--line)}
+canvas{display:block;width:100%;height:auto;aspect-ratio:1/0.75;touch-action:pan-y}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);font:12px var(--mono);padding:6px 8px;max-width:280px;display:none;z-index:2;word-break:break-word}
+.key{display:flex;gap:14px;flex-wrap:wrap;font:12px var(--mono);color:var(--ink2);margin:6px 0}
+.key i{display:inline-block;width:18px;height:0;border-top:2px solid;vertical-align:middle;margin-right:5px}
+#loading{padding:40px 0;color:var(--ink2);font-family:var(--mono)}
+</style>
+<div class="wrap">
+<header>
+  <h1>Détecteur de langue KCT</h1>
+  <p class="sub">Classifieur de n-grammes hachés, 42 langues, entraîné hors ligne, embarqué en int8 dans l'extension Kick Chat Translator.</p>
+</header>
+<div id="loading" role="status">Chargement du modèle et des mesures…</div>
+<main id="main" hidden>
+
+<section id="demo" style="border-top:0;margin-top:0;padding-top:0">
+  <h2>Démo en direct</h2>
+  <p class="lede">L'inférence tourne ici, dans ta page : même code que l'extension (normalisation, hachage FNV-1a, softmax calibré).</p>
+  <div class="demo">
+    <label for="txt" class="mono" style="font-size:12px;color:var(--ink2)">Texte à identifier</label>
+    <input id="txt" type="text" value="je sais pas ce qu'il fait mdr" autocomplete="off" spellcheck="false">
+    <div class="chips" id="chips"></div>
+    <div class="bars" id="bars" aria-live="polite"></div>
+    <div class="meta">
+      <div><b>Texte normalisé</b><span class="v" id="norm"></span></div>
+      <div><b>Caractéristiques</b><span class="v" id="nfeat"></span></div>
+    </div>
+    <div class="verdict" id="verdict"></div>
+  </div>
+</section>
+
+<section id="kpis"><h2>Chiffres clés</h2>
+  <p class="lede">Banc Tatoeba : phrases propres, 5040 au total. Chat : coût d'erreur moyen par ligne sur le jeu de développement (711 lignes, seuls les agrégats sont montrés), plus bas = mieux.</p>
+  <div class="kpis" id="kpigrid"></div>
+</section>
+
+<section id="arch"><h2>Architecture</h2>
+  <p class="lede">Une régression logistique sur traits hachés. Aucun réseau, aucune couche cachée : le modèle tient dans <span id="mbytes" class="n"></span>.</p>
+  <div class="scroll"><div class="svgmin" id="archsvg"></div></div>
+</section>
+
+<section id="curve"><h2>Courbe des seuils</h2>
+  <p class="lede">Coût moyen par ligne selon le seuil de confiance du détecteur (det). Trait plein : seuil de silence 0,95. Tireté : silence désactivé. Pointillé fin : coût de la version actuelle (master).</p>
+  <div class="key" id="curvekey"></div>
+  <div class="scroll"><div class="svgmin" id="curvesvg"></div></div>
+</section>
+
+<section id="perlang"><h2>Précision par langue</h2>
+  <p class="lede">Tatoeba, 42 langues triées par précision du modèle. Master (franc) en ocre, modèle en vert.</p>
+  <div class="key"><span><i style="border-color:var(--master)"></i>master</span><span><i style="border-color:var(--model)"></i>modèle</span></div>
+  <div class="scroll"><div class="svgmin" id="langsvg"></div></div>
+</section>
+
+<section id="conf"><h2>Principales confusions</h2>
+  <div class="two">
+    <div class="scroll"><table id="cm"><caption class="cap" style="text-align:left;caption-side:top">Master (franc)</caption></table></div>
+    <div class="scroll"><table id="cn"><caption class="cap" style="text-align:left;caption-side:top">Modèle</caption></table></div>
+  </div>
+</section>
+
+<section id="calib"><h2>Calibration</h2>
+  <p class="lede">Sur le jeu de développement : la précision réelle dans chaque tranche de confiance. Une barre qui touche la diagonale signifie que la probabilité annoncée est honnête.</p>
+  <div class="scroll"><div class="svgmin" style="min-width:480px" id="calsvg"></div></div>
+</section>
+
+<section id="map"><h2>Carte 2D</h2>
+  <p class="lede">Projection (ACP) des log-probabilités du modèle sur les 5040 phrases du banc. Anneau rouge : phrase mal classée. Survole un point, ou clique une langue pour la mettre en évidence.</p>
+  <div class="mapbox" id="mapbox"><canvas id="cv" role="img" aria-label="Nuage de points des phrases du banc, colorées par langue"></canvas><div class="tip" id="tip"></div></div>
+  <div class="legend" id="legend"></div>
+</section>
+
+<section id="log"><h2>Journal de recherche</h2>
+  <div class="scroll"><table id="logtab"></table></div>
+</section>
+
+</main>
+</div>
+<script>
+"use strict";
+// ---- port exact de src/content/lid/model.ts ----
+const MAX_CHARS=256;
+function lidNormalize(t){return t.normalize('NFKC').toLowerCase().replace(/https?:\/\/\S+|www\.\S+/gu,' u ').replace(/[0-9]/g,'0').replace(/(.)\1{2,}/gsu,'$1$1').replace(/\s+/gu,' ').trim();}
+function utf8(cp){if(cp<0x80)return[cp];if(cp<0x800)return[0xc0|(cp>>6),0x80|(cp&63)];if(cp<0x10000)return[0xe0|(cp>>12),0x80|((cp>>6)&63),0x80|(cp&63)];return[0xf0|(cp>>18),0x80|((cp>>12)&63),0x80|((cp>>6)&63),0x80|(cp&63)];}
+const FNV_OFFSET=0x811c9dc5;
+const fnvStep=(h,b)=>Math.imul(h^b,0x01000193)>>>0;
+function lidFeatures(norm,buckets){
+  const cps=Array.from(norm).slice(0,MAX_CHARS);
+  const chars=[' ',...cps,' '].map(c=>utf8(c.codePointAt(0)));
+  const mask=buckets-1,out=[];
+  for(let n=1;n<=4;n++)for(let i=0;i+n<=chars.length;i++){let h=FNV_OFFSET;for(let k=i;k<i+n;k++)for(const b of chars[k])h=fnvStep(h,b);out.push(h&mask);}
+  const words=[' ',...cps,' '].join('').split(' ');
+  for(const w of words){if(!w)continue;let h=FNV_OFFSET;for(const b of[0x77,0x3a])h=fnvStep(h,b);for(const c of Array.from(w))for(const b of utf8(c.codePointAt(0)))h=fnvStep(h,b);out.push(h&mask);}
+  return out;
+}
+function decodeModel(b64){
+  try{
+    const bin=atob(b64),bytes=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+    const view=new DataView(bytes.buffer);
+    if(bin.slice(0,4)!=='LID1')return undefined;
+    const end=bytes.length-4;let h=FNV_OFFSET;
+    for(let i=0;i<end;i++)h=fnvStep(h,bytes[i]);
+    if(h!==view.getUint32(end,true))return undefined;
+    let o=4;const buckets=view.getUint32(o,true),classes=view.getUint32(o+4,true),temperature=view.getFloat32(o+8,true);o+=12;
+    const labels=[],dec=new TextDecoder();
+    for(let c=0;c<classes;c++){const len=bytes[o];labels.push(dec.decode(bytes.subarray(o+1,o+1+len)));o+=1+len;}
+    const floats=n=>{const a=new Float32Array(n);for(let i=0;i<n;i++)a[i]=view.getFloat32(o+4*i,true);o+=4*n;return a;};
+    const bias=floats(classes),scale=floats(buckets);
+    if(o+buckets*classes!==end)return undefined;
+    const weight=new Int8Array(bytes.buffer,o,buckets*classes);
+    return{buckets,labels,temperature,bias,scale,weight};
+  }catch{return undefined;}
+}
+function lidProbabilities(text,m){
+  if(!m)return undefined;
+  const norm=lidNormalize(text);if(!norm)return undefined;
+  const feats=lidFeatures(norm,m.buckets),C=m.labels.length,z=new Float64Array(C);
+  for(const f of feats){const s=m.scale[f],row=f*C;for(let c=0;c<C;c++)z[c]+=s*m.weight[row+c];}
+  let max=-Infinity;
+  for(let c=0;c<C;c++){z[c]=(z[c]/feats.length+m.bias[c])/m.temperature;if(z[c]>max)max=z[c];}
+  let sum=0;for(let c=0;c<C;c++)sum+=z[c]=Math.exp(z[c]-max);
+  const out=new Map();for(let c=0;c<C;c++)out.set(m.labels[c],z[c]/sum);
+  return{probs:out,norm,nfeat:feats.length};
+}
+if(typeof module!=='undefined')module.exports={lidNormalize,lidFeatures,decodeModel,lidProbabilities};
+</script>
+<script>
+(function(){
+if(typeof document==='undefined')return;
+const $=id=>document.getElementById(id);
+const NS='http://www.w3.org/2000/svg';
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fx=(v,d=1)=>v.toFixed(d).replace('.',',');
+const pc=(v,d=1)=>fx(v*100,d)+' %';
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const PATHS=[['none','Sans détecteur (Brave)','--p-none'],['chrome','Chrome','--p-chrome'],['firefox','Firefox','--p-firefox']];
+let D,M;
+
+Promise.all([fetch('data.json').then(r=>r.json()),fetch('model.b64').then(r=>r.text())]).then(([d,b])=>{
+  D=d;M=decodeModel(b.trim());
+  $('loading').remove();$('main').hidden=false;
+  demo();kpis();arch();curve();perlang();conf();calib();map();log();
+  addEventListener('resize',()=>{clearTimeout(window.__rt);window.__rt=setTimeout(()=>{drawMap()},120)});
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{curve();perlang();calib();arch();drawMap()});
+}).catch(e=>{$('loading').textContent='Échec du chargement : '+e.message;});
+
+// ---------- démo ----------
+function demo(){
+  const ex=[['Français',"je sais pas ce qu'il fait mdr"],['Espagnol','no sé qué está haciendo, qué locura'],['Portugais','nao sei o que'],['Danois','jeg ved ikke'],['Russe','я не знаю, что он делает'],['Arabe','لا أعرف ماذا يفعل']];
+  const chips=$('chips');
+  ex.forEach(([l,t])=>{const b=document.createElement('button');b.className='chip';b.type='button';b.textContent=l;b.onclick=()=>{$('txt').value=t;run();};chips.appendChild(b);});
+  $('txt').addEventListener('input',run);
+  if(!M){$('verdict').className='verdict no';$('verdict').textContent='Modèle illisible (somme de contrôle ou format invalide).';return;}
+  run();
+}
+function run(){
+  const r=lidProbabilities($('txt').value,M),bars=$('bars');
+  if(!r){bars.innerHTML='<div class="cap">Saisis du texte.</div>';$('norm').textContent='';$('nfeat').textContent='0';$('verdict').className='verdict no';$('verdict').textContent='Rien à analyser : l\'extension se tait.';return;}
+  const top=[...r.probs].sort((a,b)=>b[1]-a[1]).slice(0,8);
+  bars.innerHTML=top.map(([l,p],i)=>`<div class="bar${i?'':' top'}"><span>${esc(l)}</span><span class="t"><span class="f" style="width:${(p*100).toFixed(2)}%"></span></span><span class="p">${pc(p)}</span></div>`).join('');
+  $('norm').textContent=r.norm;$('nfeat').textContent=r.nfeat;
+  const v=$('verdict'),p=top[0][1];
+  v.className='verdict '+(p>=0.8?'ok':'no');
+  v.textContent=p>=0.8?`sûr : ${top[0][0]} (${pc(p)})`:`trop incertain : l'extension se tait (meilleure hypothèse ${top[0][0]}, ${pc(p)})`;
+}
+
+// ---------- chiffres clés ----------
+function kpis(){
+  let n=0,a=0,b=0;for(const k in D.bench.per_lang){const e=D.bench.per_lang[k];n+=e.n;a+=e.master;b+=e.model;}
+  const cells=[`<div class="kpi"><div class="l">Banc Tatoeba, master</div><div class="big">${pc(a/n)}</div><div class="s">${a} / ${n} phrases</div></div>`,
+  `<div class="kpi"><div class="l">Banc Tatoeba, modèle</div><div class="big">${pc(b/n)}</div><div class="s">${b} / ${n} phrases</div></div>`];
+  for(const [k,lab] of PATHS){
+    const m0=D.dev.master_cost[k],best=Math.min(...D.dev.curve.map(c=>c[k])),ch=(best-m0)/m0;
+    cells.push(`<div class="kpi"><div class="l">Coût chat, ${lab}</div><div class="big">${(ch>0?'+':'-')+fx(Math.abs(ch)*100,1)} %</div><div class="s">master ${fx(m0,3)} puis meilleur modèle ${fx(best,3)}</div></div>`);
+  }
+  $('kpigrid').innerHTML=cells.join('');
+}
+
+// ---------- svg helper ----------
+function svg(w,h,inner){return `<svg xmlns="${NS}" viewBox="0 0 ${w} ${h}" width="100%" role="img" style="max-width:${w}px">${inner}</svg>`;}
+const T=(x,y,s,o='')=>`<text x="${x}" y="${y}" font-size="11" ${o}>${esc(s)}</text>`;
+
+// ---------- architecture ----------
+function arch(){
+  const m=D.model,K=Math.round(m.bytes/1024);
+  $('mbytes').textContent=(m.bytes/1048576).toFixed(2).replace('.',',')+' Mo ('+m.bytes.toLocaleString('fr-FR')+' octets)';
+  const steps=[
+    ['Texte','message de chat'],
+    ['Normalisation','NFKC, minuscules, URL, 0-9 vers 0, répétitions, 256 car. max'],
+    ['Traits','n-grammes de car. 1 à 4 + mots (w:)'],
+    ['Hachage','FNV-1a, masque sur '+m.buckets.toLocaleString('fr-FR')+' cases (2^15)'],
+    ['Poids int8','cases x '+m.labels.length+' classes, échelle par case'],
+    ['Moyenne + biais','somme / nb de traits, + biais par classe'],
+    ['Température','division par '+fx(m.temperature,3)],
+    ['Softmax','sur '+m.labels.length+' langues']];
+  const w=210,g=34,bh=74,pad=10,cols=4,rows=2,W=cols*w+(cols-1)*g+2*pad,H=rows*bh+g+2*pad+38;
+  let s=`<defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="${css('--ink2')}"/></marker></defs>`;
+  const pos=i=>{const r=Math.floor(i/cols),c=i%cols;return[pad+c*(w+g),pad+r*(bh+g)];};
+  steps.forEach((st,i)=>{
+    const[x,y]=pos(i),last=i===steps.length-1;
+    s+=`<rect x="${x}" y="${y}" width="${w}" height="${bh}" fill="${css('--panel')}" stroke="${last?css('--accent'):css('--line')}" stroke-width="${last?2:1}"/>`;
+    s+=`<text x="${x+10}" y="${y+20}" font-size="12" font-weight="500" style="fill:${css('--ink')}">${i+1}. ${esc(st[0])}</text>`;
+    wrap(st[1],30).forEach((ln,j)=>{s+=T(x+10,y+38+j*13,ln);});
+    if(i<steps.length-1){
+      const[nx,ny]=pos(i+1);
+      if(Math.floor((i+1)/cols)===Math.floor(i/cols))s+=`<line x1="${x+w}" y1="${y+bh/2}" x2="${nx-2}" y2="${y+bh/2}" stroke="${css('--ink2')}" marker-end="url(#ar)"/>`;
+      else s+=`<path d="M${x+w/2} ${y+bh} V${y+bh+g/2} H${nx+w/2} V${ny-2}" fill="none" stroke="${css('--ink2')}" marker-end="url(#ar)"/>`;
+    }
+  });
+  const ty=H-12;
+  s+=T(pad,ty,`${m.labels.length} classes, ${m.buckets.toLocaleString('fr-FR')} cases, ${K} Ko de poids : un seuil à 0,8 décide si l'extension parle ou se tait`);
+  $('archsvg').innerHTML=svg(W,H,s);
+}
+function wrap(t,n){const o=[];let l='';for(const w of t.split(' ')){if((l+' '+w).trim().length>n){o.push(l);l=w;}else l=(l+' '+w).trim();}if(l)o.push(l);return o.slice(0,3);}
+
+// ---------- courbe ----------
+function curve(){
+  const c=D.dev.curve,dets=[...new Set(c.map(r=>r.det))].sort((a,b)=>a-b);
+  const W=760,H=360,L=52,R=16,Tp=14,B=44,pw=W-L-R,ph=H-Tp-B;
+  let all=[];PATHS.forEach(([k])=>{c.forEach(r=>all.push(r[k]));all.push(D.dev.master_cost[k]);});
+  let lo=Math.min(...all),hi=Math.max(...all);const pad=(hi-lo)*.08;lo=Math.max(0,lo-pad);hi+=pad;
+  const X=i=>L+(dets.length>1?i/(dets.length-1)*pw:pw/2),Y=v=>Tp+(1-(v-lo)/(hi-lo))*ph;
+  let s='';
+  for(let i=0;i<=5;i++){const v=lo+(hi-lo)*i/5,y=Y(v);s+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="${css('--grid')}"/>`+T(L-6,y+4,fx(v,2),'text-anchor="end"');}
+  dets.forEach((d,i)=>{s+=T(X(i),H-B+16,fx(d,2),'text-anchor="middle"');});
+  s+=T(L+pw/2,H-8,'seuil du détecteur (det)','text-anchor="middle"')+`<text transform="translate(12 ${Tp+ph/2}) rotate(-90)" font-size="11" text-anchor="middle">coût moyen par ligne</text>`;
+  PATHS.forEach(([k,lab,v])=>{
+    const col=css(v);
+    s+=`<line x1="${L}" x2="${W-R}" y1="${Y(D.dev.master_cost[k])}" y2="${Y(D.dev.master_cost[k])}" stroke="${col}" stroke-dasharray="1 4" stroke-width="1.6" opacity=".9"/>`;
+    for(const sl of [0.95,'off']){
+      const pts=dets.map((d,i)=>{const r=c.find(q=>q.det===d&&q.sl===sl);return r?[X(i),Y(r[k]),r[k]]:null;}).filter(Boolean);
+      s+=`<polyline fill="none" stroke="${col}" stroke-width="2" ${sl==='off'?'stroke-dasharray="7 4"':''} points="${pts.map(p=>p[0]+','+p[1]).join(' ')}"/>`;
+      pts.forEach(p=>{s+=`<circle cx="${p[0]}" cy="${p[1]}" r="2.6" fill="${col}"><title>${lab}, sl ${sl==='off'?'désactivé':'0,95'} : ${fx(p[2],3)}</title></circle>`;});
+    }
+  });
+  $('curvesvg').innerHTML=svg(W,H,s);
+  $('curvekey').innerHTML=PATHS.map(([k,l,v])=>`<span><i style="border-color:var(${v})"></i>${l}</span>`).join('')+'<span>plein : sl 0,95</span><span>tireté : sl désactivé</span><span>pointillé fin : master</span>';
+}
+
+// ---------- par langue ----------
+function perlang(){
+  const rows=Object.entries(D.bench.per_lang).map(([k,e])=>({k,n:e.n,a:e.master/e.n,b:e.model/e.n})).sort((x,y)=>y.b-x.b||y.a-x.a);
+  const W=760,rh=18,Tp=24,L=50,R=60,H=Tp+rows.length*rh+8,lo=Math.min(...rows.map(r=>Math.min(r.a,r.b))),min=Math.max(0,Math.floor(lo*20)/20-.05);
+  const X=v=>L+(v-min)/(1-min)*(W-L-R);
+  let s='';
+  for(let v=Math.ceil(min*10)/10;v<=1.0001;v+=.1){s+=`<line x1="${X(v)}" x2="${X(v)}" y1="${Tp-6}" y2="${H-6}" stroke="${css('--grid')}"/>`+T(X(v),12,Math.round(v*100)+' %','text-anchor="middle"');}
+  rows.forEach((r,i)=>{
+    const y=Tp+i*rh+rh/2;
+    s+=T(L-8,y+4,r.k,'text-anchor="end"');
+    s+=`<line x1="${X(r.a)}" x2="${X(r.b)}" y1="${y}" y2="${y}" stroke="${r.b<r.a?css('--bad'):css('--ink2')}" stroke-width="2" opacity=".6"/>`;
+    s+=`<circle cx="${X(r.a)}" cy="${y}" r="4.5" fill="${css('--master')}"><title>${r.k} master : ${pc(r.a)} sur ${r.n}</title></circle>`;
+    s+=`<circle cx="${X(r.b)}" cy="${y}" r="4.5" fill="${css('--model')}"><title>${r.k} modèle : ${pc(r.b)} sur ${r.n}</title></circle>`;
+    s+=T(W-R+8,y+4,pc(r.b,1));
+  });
+  $('langsvg').innerHTML=svg(W,H,s);
+}
+
+// ---------- confusions ----------
+function conf(){
+  const t=(el,rows)=>{el.insertAdjacentHTML('beforeend','<thead><tr><th>Référence</th><th>Prédit</th><th>Nombre</th></tr></thead><tbody>'+rows.slice(0,12).map(r=>`<tr><td class="mono">${esc(r[0])}</td><td class="mono">${esc(r[1])}</td><td class="num">${r[2]}</td></tr>`).join('')+'</tbody>');};
+  t($('cm'),D.bench.confusions_master);t($('cn'),D.bench.confusions_model);
+}
+
+// ---------- calibration ----------
+function calib(){
+  const rel=D.dev.reliability,W=560,H=340,L=46,R=14,Tp=14,B=52,pw=W-L-R,ph=H-Tp-B;
+  const X=v=>L+v*pw,Y=v=>Tp+(1-v)*ph;let s='';
+  for(let i=0;i<=5;i++){const v=i/5;s+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="${css('--grid')}"/>`+T(L-6,Y(v)+4,Math.round(v*100)+' %','text-anchor="end"');}
+  const bw=pw/10-6;
+  rel.forEach(r=>{
+    const x=X(r.lo)+3;
+    s+=T(x+bw/2,H-B+14,fx(r.lo,1),'text-anchor="middle"')+T(x+bw/2,H-B+28,'n='+r.n,'text-anchor="middle" font-size="10"');
+    if(r.acc==null)return;
+    s+=`<rect x="${x}" y="${Y(r.acc)}" width="${bw}" height="${Y(0)-Y(r.acc)}" fill="${css('--accent')}" opacity=".85"><title>confiance ${fx(r.lo,1)} à ${fx(r.lo+.1,1)} : précision ${pc(r.acc)}, confiance moyenne ${pc(r.conf)}, n=${r.n}</title></rect>`;
+  });
+  s+=`<line x1="${X(0)}" y1="${Y(0)}" x2="${X(1)}" y2="${Y(1)}" stroke="${css('--ink')}" stroke-dasharray="5 4" stroke-width="1.5"/>`;
+  s+=T(L+pw/2,H-4,'confiance annoncée (tranches de 0,1)','text-anchor="middle"')+`<text transform="translate(12 ${Tp+ph/2}) rotate(-90)" font-size="11" text-anchor="middle">précision observée</text>`;
+  $('calsvg').innerHTML=svg(W,H,s);
+}
+
+// ---------- carte ----------
+let hl=null,pts,colors={},cvInfo;
+function map(){
+  pts=D.bench.points;
+  const labs=[...new Set(pts.map(p=>p.g))].sort();
+  labs.forEach((l,i)=>{const h=(i*137.508)%360,L=[.62,.74,.5][i%3];colors[l]=`oklch(${L} 0.15 ${h.toFixed(1)})`;});
+  const lg=$('legend');
+  labs.forEach(l=>{const b=document.createElement('button');b.type='button';b.setAttribute('aria-pressed','false');b.innerHTML=`<i style="background:${colors[l]}"></i>${esc(l)}`;b.onclick=()=>{hl=hl===l?null:l;lg.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x.textContent===hl)));drawMap();};lg.appendChild(b);});
+  const cv=$('cv'),tip=$('tip');
+  cv.addEventListener('mousemove',e=>{
+    const r=cv.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;let best=-1,bd=14*14;
+    const{sx,sy}=cvInfo(r.width,r.height);
+    for(let i=0;i<pts.length;i++){const dx=sx(pts[i].x)-mx,dy=sy(pts[i].y)-my,d=dx*dx+dy*dy;if(d<bd){bd=d;best=i;}}
+    if(best<0){tip.style.display='none';return;}
+    const p=pts[best];tip.innerHTML=`${esc(p.t)}<br>gold : ${esc(p.g)} | prédit : ${esc(p.p)}${p.g!==p.p?' (erreur)':''}`;
+    tip.style.display='block';const tx=Math.min(mx+12,r.width-tip.offsetWidth-4);tip.style.left=Math.max(4,tx)+'px';tip.style.top=(my+14>r.height-50?my-50:my+14)+'px';
+  });
+  cv.addEventListener('mouseleave',()=>tip.style.display='none');
+  drawMap();
+}
+function drawMap(){
+  if(!pts)return;
+  const cv=$('cv'),r=cv.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);
+  if(!r.width)return;
+  cv.width=r.width*dpr;cv.height=r.height*dpr;
+  const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);
+  const pad=14;
+  cvInfo=(w,h)=>({sx:x=>pad+x*(w-2*pad),sy:y=>pad+y*(h-2*pad)});
+  const{sx,sy}=cvInfo(r.width,r.height);
+  const dim=hl!==null,bad=css('--bad');
+  const draw=(p,alpha,rad)=>{ctx.globalAlpha=alpha;ctx.fillStyle=colors[p.g];ctx.beginPath();ctx.arc(sx(p.x),sy(p.y),rad,0,6.2832);ctx.fill();};
+  pts.forEach(p=>{if(!dim||p.g!==hl)draw(p,dim?.1:.75,2.2);});
+  if(dim)pts.forEach(p=>{if(p.g===hl)draw(p,1,3);});
+  ctx.globalAlpha=1;ctx.lineWidth=1.2;ctx.strokeStyle=bad;
+  pts.forEach(p=>{if(p.g!==p.p&&(!dim||p.g===hl)){ctx.globalAlpha=dim?1:.8;ctx.beginPath();ctx.arc(sx(p.x),sy(p.y),4.6,0,6.2832);ctx.stroke();}});
+  ctx.globalAlpha=1;
+}
+
+// ---------- journal ----------
+function log(){
+  const rows=D.research.split('\n').filter(l=>l.trim().startsWith('|')).map(l=>l.trim().replace(/^\||\|$/g,'').split('|').map(c=>c.trim()));
+  const body=rows.filter(r=>!r.every(c=>/^:?-+:?$/.test(c)));
+  if(!body.length){$('logtab').outerHTML='<p class="cap">Aucun tableau trouvé.</p>';return;}
+  const [h,...rest]=body;
+  $('logtab').innerHTML='<thead><tr>'+h.map(c=>`<th>${esc(c)}</th>`).join('')+'</tr></thead><tbody>'+rest.map(r=>'<tr>'+r.map((c,i)=>`<td${i===0?' class="mono"':''}>${esc(c.replace(/`/g,''))}</td>`).join('')+'</tr>').join('')+'</tbody>';
+}
+})();
+</script>
+
+</body>
+</html>
