@@ -78,10 +78,12 @@ Fixée **avant toute mesure** (dans la spécification, avec la mention « non mo
 |---|:---:|---|
 | Ligne cachée à tort | 10 | perte d'information irréversible pour le lecteur |
 | Mauvaise langue source envoyée au cloud | 5 | traduction absurde, mais le lecteur voit au moins l'original |
-| Mauvaise langue source imposée au moteur sur l'appareil | 4 | même nature, moteur local plus tolérant |
 | Mauvais drapeau, rien de caché | 1 | gêne visuelle |
 | Silence (le cloud détecte) | 0,5 | on perd un éventuel gain de qualité à donner `sl` |
+| Ligne gardée alors que sa langue est hors liste blanche (lecteur à liste blanche seulement) | 1 | le lecteur a demandé à ne pas la voir |
 | Bonne réponse | 0 | |
+
+La spécification prévoyait aussi un coût de 4 pour une mauvaise langue source imposée au moteur sur l'appareil. Le simulateur (`cost.py`) ne l'applique pas : le mode par défaut de l'extension est « cloud d'abord » depuis la 3.5.0, ce cas n'arrive donc pas avec les réglages simulés. Le coût 1 de la ligne gardée hors liste blanche ne concerne que le lecteur à liste blanche.
 
 Le coût est simulé sur un panel de lecteurs (langues cibles fr, es, pt, de, en, ru, tr, ar, réglages par défaut, plus un lecteur avec une liste blanche de langues sources), puis moyenné par ligne, pour chacun des trois chemins (aucun détecteur, Chrome, Firefox).
 
@@ -148,12 +150,12 @@ Le poids **0,5 du silence** suppose que donner la bonne langue source au cloud a
 ## 5. Le protocole de mesure
 
 1. **Banc Tatoeba (5 040 phrases)** : rapporté, jamais utilisé pour choisir. Ses phrases sont exclues de l'entraînement par empreinte du texte normalisé ; un test échoue si l'une d'elles est injectée.
-2. **dev** : choix du modèle, de la température, des seuils `tau_det` (au-dessus : on répond) et `tau_sl` (au-dessus : on envoie la langue source au cloud), et du paramètre `k` de l'adaptation.
+2. **dev** : température ajustée sur la moitié paire des lignes étiquetées, ECE rapportée sur la moitié impaire ; choix du modèle, des seuils `tau_det` (au-dessus : on répond) et `tau_sl` (au-dessus : on envoie la langue source au cloud), et du paramètre `k` de l'adaptation.
 3. **Simulateur de coût** (`cost.py`) : rejoue la décision de l'extension (cacher, drapeau, `sl`, silence) pour chaque lecteur et chaque chemin. La spécification prévoyait de le vérifier contre la vraie fonction de l'extension sur 50 lignes avant de lui faire confiance.
 4. **Statistiques** : intervalle de confiance du gain (bootstrap), test de McNemar sur les erreurs appariées (même ligne, avant/après).
 5. **heldout** : une seule lecture, à la fin, sur la configuration figée.
 
-**Faiblesse assumée** : dev sert à la fois à la température, aux seuils, à `k` et au choix du modèle. Les chiffres de dev sont donc optimistes ; seul heldout dira le vrai gain.
+**Faiblesse assumée** : dev sert à la fois aux seuils, à `k` et au choix du modèle (seule la température est ajustée sur une moitié). Les chiffres de dev sont donc optimistes ; seul heldout dira le vrai gain.
 
 ---
 
@@ -255,14 +257,14 @@ La spécification et le plan ont été écrits **avant** le travail (dans la bra
 
 | Plan écrit | Fait | Conséquence |
 |---|---|---|
-| Température ajustée sur une moitié de dev, vérifiée sur l'autre | dev entier sert à la température et aux seuils | chiffres dev plus optimistes |
+| Température ajustée sur une moitié de dev, vérifiée sur l'autre | fait ainsi (`train.py` : moitié paire, ECE sur l'impaire) ; mais seuils, `k` et modèle sont choisis sur dev entier | chiffres dev des seuils plus optimistes |
 | Seuils par langue quand une langue a 50 lignes de dev ou plus | seuils globaux (`tau_det` 0,8, `tau_sl` 0,95) | plus simple, peut-être sous-optimal sur certaines langues |
 | Chat réel ajouté seulement s'il bat « Tatoeba seul » sur dev | remplacé par l'auto-apprentissage (E9), qui le bat | même logique, autre forme |
-| Coût du moteur sur l'appareil (4) dans la table | peu exercé dans les mesures rapportées | à vérifier dans `cost.py` |
-| Simulateur vérifié contre la vraie fonction de l'extension sur 50 lignes | pas confirmé dans le journal | le simulateur est cru sur parole |
-| Comparaison linéaire / fastText à égalité de coût, le plus simple gagne | linéaire contre réseau maison (E7) | fastText officiel jamais essayé (licence) |
+| Coût du moteur sur l'appareil (4) dans la table | absent de `cost.py` (mode par défaut cloud d'abord) ; ajout d'un coût 1 « gardée hors liste blanche » non prévu | la table simulée n'est pas celle de la spécification, écart à juger |
+| Simulateur vérifié contre la vraie fonction de l'extension sur 50 lignes | 9 cas communs (`cost-cases.json`) testés des deux côtés pour les règles de suppression seulement | drapeau, `sl` et silence crus sur parole (REVUE §10 bis) |
+| Comparaison linéaire / fastText à égalité de coût, le plus simple gagne | linéaire contre réseau maison (E7), puis fastText lid.176 en référence le 22/11 : 0,390 contre 0,306 | fastText non réentraîné sur nos données (licence, et pas d'entraînement en ce moment) |
 | `franc` retiré s'il est battu dans chaque tranche de longueur | pas encore tranché | |
-| p95 sous 0,3 ms par ligne en build de production | inférence mesurée « moins d'une milliseconde » | mesure exacte en production à faire |
+| p95 sous 0,3 ms par ligne en build de production | p95 0,044 ms en Node sur le PC de développement (REVUE §10 bis) | navigateur réel et machine modeste pas mesurés |
 | B conditionné à un résidu chiffré | pas encore mesuré | |
 | Test de fumée de 15 minutes sur kick.com, PR sans fusion | pas encore | la recherche n'est pas finie |
 
@@ -294,7 +296,7 @@ La spécification et le plan ont été écrits **avant** le travail (dans la bra
 Par ordre d'importance, à mon avis :
 
 1. **Le poids 0,5 du silence** et la dépendance du gain Chrome/Firefox à l'envoi de `sl` (§2, E3b).
-2. **Le sur-ajustement à dev** : température, seuils, `k` et choix du modèle sur le même jeu (§5, §9).
+2. **Le sur-ajustement à dev** : seuils, `k` et choix du modèle sur le même jeu (§5, §9), et un heldout déjà mesuré pour la base `master` (REVUE §3 bis).
 3. **La boucle de l'auto-apprentissage** : apprendre ses propres certitudes ne corrige pas les erreurs de fond (§8).
 4. **L'adaptation par chaîne** : risque de renforcer une erreur initiale, comportement sur un changement de langue (§7).
 5. **Le choix linéaire contre réseau** : E7 a-t-il été un test juste (calibration, régularisation) ou un réseau mal réglé ?

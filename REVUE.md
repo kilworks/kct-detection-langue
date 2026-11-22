@@ -28,11 +28,21 @@ Le détecteur actuel (branche `master`, version 3.6.2) combine `franc-min`, des 
 |---|---|---|---|
 | Tatoeba | 42 langues, 20 000 phrases max par langue, CC BY 2.0 FR | entraînement + banc de 5 040 phrases | oui (source publique) |
 | Augmentations | minuscules, sans ponctuation, fenêtres de 1 à 4 mots, sans accents, hindi et bengali romanisés synthétiques (`romanize.py`) | rapprocher Tatoeba du registre du chat | code oui |
-| **dev** | 711 lignes de chat Kick réel annotées dans une langue (hors neutre, autre, mélange), captures du 04/11 | choix du modèle, de la température, des seuils, de k | agrégats seulement |
-| **heldout** | 993 lignes de chat Kick annotées, mises de côté | **lecture unique à la fin** | non lu |
+| **dev** | 1 007 lignes annotées, dont 711 dans une seule langue (les seules comptées au coût), captures du 04/11 | choix du modèle, des seuils, de k ; température sur sa moitié paire | agrégats seulement |
+| **heldout** | 993 lignes de chat Kick annotées, mises de côté | **lecture unique à la fin** pour ce modèle | jamais lu ligne à ligne ; déjà mesuré en agrégats pour le détecteur `master` (voir §3 bis) |
 | Chat non étiqueté (E9) | voir §7 | auto-apprentissage, simulation de l'adaptation | agrégats seulement |
 
 Garde : aucun texte de dev ni de heldout n'entre à l'entraînement (exclusion au texte normalisé, testée par `test_dataset.py`).
+
+## 3 bis. Comment dev et heldout ont été annotés
+
+- **Échantillon** : 2 000 lignes tirées des captures Kick du 04/11 (`test/e2e/real-bench.mjs sample`), sans la langue déclarée de la chaîne (l'annotateur ne voit que l'id et le texte).
+- **Deux annotateurs indépendants, deux consignes différentes** : A « linguiste de terrain » (`consigne-a.md`), B « modérateur d'une équipe de traduction » (`consigne-b.md`). Mêmes champs : langue (40 codes, ou `neutral`, `mixed`, `other`), variante, argot, romanisé, alternance de langues, émotes seules, commande de bot, anglais de chat. Les consignes sont rédigées comme des instructions pour un modèle de langage ; **qui a annoté (humain ou modèle, lequel) reste à confirmer par le propriétaire**.
+- **Accord** (kappa de Cohen sur 2 000 lignes) : langue 0,96 (accord brut 96,35 %), variante 0,92, romanisé 0,92, anglais de chat 0,81, alternance 0,73, argot 0,71.
+- **Désaccords** : 478 lignes ont au moins un champ en désaccord (`disagreements.jsonl`). **Aucun n'a été tranché.** Un champ n'est retenu que si les deux annotateurs sont d'accord, sinon il vaut `null` et la ligne sort du coût.
+- **Coupe par capture** (jamais par ligne) : dev 1 007 lignes, heldout 993 (empreinte sha256 vérifiée).
+- **Composition de dev** : 711 lignes dans une seule langue (comptées au coût), 209 neutres, 49 « autre » (langue hors liste : serbe, mongol, malais...), 1 mélange, le reste `null` (désaccord). Les 296 lignes hors coût sont mesurées à part (§ analyses).
+- **Heldout n'est pas vierge** : jamais lu ligne à ligne, mais ses totaux ont été calculés pour le détecteur `master` le 04/11 (base : sûr 359 justes, 338 silences, 3 fausses sur 700 lignes à langue d'accord ; brut 428 / 156 / 116), puis le 05/11 une dizaine de fois pour accepter ou refuser des règles de `master` (trois règles refusées sur un écart d'une ligne dans heldout). Rien de cette recherche ne l'a encore touché, mais `master`, la base de comparaison, a été en partie réglée dessus.
 
 ## 4. Fonction de coût (fixée avant toute mesure)
 
@@ -40,9 +50,11 @@ Garde : aucun texte de dev ni de heldout n'entre à l'entraînement (exclusion a
 |---|:---:|
 | Message caché à tort | 10 |
 | Mauvaise langue source envoyée au cloud | 5 |
-| Mauvaise langue source imposée au moteur sur l'appareil | 4 |
 | Mauvais drapeau | 1 |
+| Ligne gardée alors que sa langue est hors de la liste blanche du lecteur | 1 |
 | Silence (le cloud détecte seul) | 0,5 |
+
+La spécification prévoyait aussi un coût de 4 pour une mauvaise langue source imposée au moteur sur l'appareil. Le simulateur (`cost.py`) ne l'applique pas : le mode par défaut de l'extension est « cloud d'abord » depuis la 3.5.0, ce cas n'arrive donc pas avec les réglages simulés. Le coût 1 de la ligne gardée hors liste blanche ne concerne que le lecteur à liste blanche.
 
 Coût moyenné par ligne et rapporté sur 3 chemins : aucun détecteur (Brave), Chrome, Firefox.
 **Contrainte dure** : le nombre de messages cachés à tort ne doit monter pour **aucun** lecteur (langue du lecteur × langues exclues) ni pour **aucun** chemin. Les seuils (détection, envoi de la langue source) sont choisis pour minimiser le coût sous cette contrainte.
@@ -102,7 +114,7 @@ Méthode : voir le protocole à la fin de [journal.md](journal.md). Points saill
 
 ## 8. Biais et menaces connus
 
-1. **dev sert à tout** (température, seuils, k, choix du modèle) : les chiffres de dev sont optimistes. Seul heldout tranchera.
+1. **dev sert presque à tout** (seuils, k, choix du modèle ; la température est ajustée sur sa moitié paire et son ECE lue sur la moitié impaire) : les chiffres de dev sont optimistes. Seul heldout tranchera.
 2. **Langue déclarée ≠ langue de la ligne** : l'anglais est partout, les chaînes mélangent. Le filtre « accord » (p ≥ 0,9 et langue déclarée d'accord) limite le bruit mais exclut justement les lignes difficiles (mélange, romanisé).
 3. **Auto-apprentissage = le modèle apprend ses propres certitudes** : il renforce ce qu'il sait déjà ; il ne peut pas apprendre seul le romanisé ou le mélange (constaté : inchangés).
 4. **Gros streams surreprésentés**, une seule fenêtre horaire (fuseaux), quelques langues très minces (hr 23 lignes, lv 81).
@@ -121,11 +133,150 @@ Méthode : voir le protocole à la fin de [journal.md](journal.md). Points saill
 ## 10. Questions précises pour le relecteur
 
 1. La fonction de coût et la contrainte « aucune hausse des messages cachés, par lecteur et par chemin » vous semblent-elles bien posées ? Le 0,5 du silence est-il défendable sans mesure de traduction ?
-2. Choisir température, seuils et k sur le même dev : quel risque réel, et faut-il couper dev en deux avant de lire heldout ?
+2. Choisir seuils, k et modèle sur le même dev (la température seule est ajustée sur une moitié) : quel risque réel, et faut-il couper dev en deux avant de lire heldout ?
 3. Auto-apprentissage : faut-il plafonner par langue, pondérer par chaîne (une chaîne bavarde ne doit pas dominer), ou passer à un second tour (réétiqueter avec le nouveau modèle) ?
 4. Romanisé et mélange de langues stagnent : données synthétiques plus riches, classe « mélange » explicite, ou laisser ces lignes au silence ?
 5. Le réseau (E7) perd au coût parce qu'il est trop sûr de lui : une calibration plus forte ou un mélange linéaire + réseau mérite-t-il un essai, ou le linéaire suffit-il ?
 6. Le contrôle de fuite E9b (Twitch seul) est-il suffisant pour écarter un biais de chaînes communes avec dev ?
+7. Avec l'adaptation, le modèle envoie une langue source au cloud pour 145 lignes neutres sur 209, que le coût ne compte pas (§10 bis) : faut-il les compter, ou interdire `sl` sans lettre significative ?
+8. Heldout a déjà servi à régler le détecteur de base (`master`) : reste-t-il un juge acceptable pour la comparaison finale, ou faut-il annoter un nouveau jeu ?
+
+## 10 bis. Analyses complémentaires du 22/11 (évaluation seule, aucun entraînement)
+
+Produites par `tools/lid/report.py` et `tools/lid/ft_bench.py` (branche `feat/lid-inference`) sur dev, avec les modèles déjà entraînés. Chaque configuration est la meilleure de la grille sous la contrainte des messages cachés, comme dans `cost.py` et `adapt.py`. Adaptation : causale, k = 10, seuil de sûreté 0,9.
+
+### Intervalles de confiance : le bootstrap de `cost.py` était trop optimiste
+
+`cost.py` rééchantillonnait par fichier de capture. Dev n'en contient que **2** : ses intervalles ne valaient rien. Refaits ici en rééchantillonnant les **232 vraies chaînes** de dev (bootstrap apparié, 2 000 tirages).
+
+| Comparaison (coût par ligne, chemin sans détecteur) | Écart | IC 95 % par chaîne |
+|---|---|---|
+| accrom-b16 seul contre `master` | 0,531 → 0,296 | [-0,298 ; -0,176] |
+| accrom-b16 adapté contre `master` | 0,531 → 0,203 | [-0,393 ; -0,268] |
+| accrom-b16 adapté contre accrom-b16 seul | 0,296 → 0,203 | [-0,128 ; -0,063] |
+| st1-b16 seul contre accrom-b16 seul | 0,296 → 0,276 | [-0,057 ; +0,021] |
+| st-twitch-b16 seul contre accrom-b16 seul | 0,296 → 0,263 | [-0,072 ; +0,008] |
+| st-kick-b16 seul contre accrom-b16 seul | 0,296 → 0,313 | [-0,015 ; +0,049] |
+| st1-b16 adapté contre accrom-b16 adapté | 0,203 → 0,182 | [-0,045 ; -0,001] |
+| st-twitch-b16 adapté contre accrom-b16 adapté | 0,203 → 0,192 | [-0,037 ; +0,018] |
+
+Lecture : le modèle et l'adaptation par chaîne battent `master` nettement, sur les trois chemins (Chrome et Firefox donnent des intervalles du même signe, voir `report.json`). En revanche, **l'auto-apprentissage (E9) n'a pas de gain établi** sur accrom-b16 : seul st1-b16 adapté passe tout juste sous zéro. Les classements E9a et E9b (« Twitch seul fait mieux ») sont dans le bruit de dev.
+
+### Confusion de taille dans E9b
+
+st-twitch-b16 a reçu 42 641 pseudo-lignes, st1-b16 28 759 et st-kick-b16 13 251 (chacune copiée 5 fois). Comparer Twitch et Kick revient donc aussi à comparer trois tailles. Le contrôle propre (sous-échantillonner Twitch à 13 251 lignes) demande un entraînement : **pas fait**, consigne du propriétaire (collecte seulement pour l'instant). Vu les intervalles ci-dessus, la question est de toute façon secondaire.
+
+### Nombre de configurations essayées sur dev
+
+Ce rapport à lui seul en évalue 864 (4 modèles × seul ou adapté × 108 points de grille). Sur toute la recherche : 12 modèles enregistrés, chacun passé dans la grille de 108 points, plus plusieurs valeurs de k (10, 50), deux clés d'adaptation (langue déclarée, chaîne), deux préréglages de loi a priori. **Au moins 1 300 configurations** ont été comparées sur les mêmes 711 lignes ; le chiffre exact n'a pas été tracé. C'est la raison principale de ne croire que heldout.
+
+### Messages cachés à tort, par lecteur et par chemin (accrom-b16 adapté)
+
+| Chemin | Lecteur fr | Lecteur en | Lecteur fr à liste blanche (en, es, pt) | Autres lecteurs |
+|---|---|---|---|---|
+| Sans détecteur | 1 → 1 | 6 → 1 | 68 → 39 | 0 → 0 |
+| Chrome | 1 → 1 | 1 → 1 | 95 → 38 | 0 → 0 |
+| Firefox | 1 → 1 | 12 → 8 | 70 → 34 | 0 → 0 |
+
+(`master` → modèle.) La contrainte tient partout ; l'essentiel du gain vient du lecteur à liste blanche.
+
+### Par langue (accrom-b16 adapté, sans détecteur, dev)
+
+| Langue | Lignes | Justes | Silences |
+|---|---|---|---|
+| en | 91 | 69 | 21 |
+| ja | 76 | 74 | 2 |
+| th | 61 | 61 | 0 |
+| fi | 48 | 42 | 5 |
+| tr | 47 | 42 | 5 |
+| pl | 46 | 42 | 4 |
+| ar | 45 | 42 | 1 |
+| pt | 39 | 28 | 10 |
+| he | 32 | 32 | 0 |
+| ru | 28 | 17 | 9 |
+| es | 26 | 20 | 5 |
+| id | 22 | 14 | 8 |
+| cs | 21 | 15 | 5 |
+| hi | 21 | 8 | 13 |
+| sk | 19 | 18 | 1 |
+| ro | 15 | 12 | 2 |
+
+Les réponses fausses sont rares et dispersées (11 sur 711 ; la plus fréquente : ru lu bg, 2 fois). Le point faible est le **silence** : anglais (21), hindi (13, presque tout du romanisé), portugais (10), russe (9, souvent translittéré).
+
+### Ligne courte (20 caractères ou moins) et calibration
+
+- Coût sur les lignes courtes, sans détecteur : `master` 0,513, accrom-b16 seul 0,359, adapté 0,233.
+- ECE (moitié impaire de dev, 10 classes) : 0,205 avant température, 0,022 après (accrom-b16, T = 0,564). Même ordre pour les autres modèles (0,016 à 0,029 après).
+
+### Les 296 lignes de dev hors du coût
+
+209 neutres, 49 « autre », 1 mélange, 37 sans accord des annotateurs. Le coût ne les voit pas ; voici ce que la décision en fait (sans détecteur) :
+
+| | `master` | accrom-b16 adapté |
+|---|---|---|
+| Neutres : réponse donnée | 47 / 209 | 147 / 209 |
+| Neutres : langue source envoyée au cloud | 4 | **145** |
+| Neutres : réponse dans une langue de lecteur (cachées pour ce lecteur) | 38 | 10 |
+| « Autre » (serbe, mongol, malais...) : réponse donnée | 25 / 49 | 12 / 49 |
+| « Autre » : réponse dans une langue de lecteur | 9 | 4 |
+
+Deux lectures. En bien : le modèle cache moins de lignes neutres et de langues hors liste. **En mal : avec l'adaptation, il envoie une langue source au cloud pour 145 lignes neutres** (« gg », « lol », émotes : la loi a priori de la chaîne les pousse au-dessus du seuil). Le coût est nul par construction sur ces lignes ; l'effet réel sur la traduction n'est pas mesuré. À corriger probablement par une règle « pas de `sl` sans lettre significative », ou à compter dans le coût.
+
+### Base de comparaison forte : fastText lid.176
+
+Le modèle public `lid.176.ftz` (176 langues, CC BY-SA 3.0, jamais destiné à être livré) branché à la place du nôtre, mêmes seuils cherchés, même contrainte :
+
+| | Langue juste (argmax brut, 711 lignes) | Coût moyen sous contrainte |
+|---|---|---|
+| fastText lid.176 | 565 (79 %) | 0,390 |
+| accrom-b16 | 624 (88 %) | 0,306 |
+| st-twitch-b16 | 634 (89 %) | 0,275 |
+| `master` | | 0,465 |
+
+Le modèle entraîné pour le chat bat la référence générique ; fastText reste meilleur que `master`. Texte passé en minuscules aux deux. Le détecteur de Chrome (LanguageDetector) n'est pas mesuré ici.
+
+### Coût dans l'extension
+
+Mesuré en Node 22 sur le PC de développement (Ryzen 9 9900X3D), code de `src/content/lid/model.ts` non modifié, 1 007 lignes de dev × 5 :
+
+| Modèle | Taille dans le paquet (base64) | Décodage au chargement | Par ligne p50 / p95 / p99 | Tas JS ajouté |
+|---|---|---|---|---|
+| base-b15 (installé aujourd'hui) | 2,0 Mo | 26 ms | 0,014 / 0,046 / 0,118 ms | 13 Mo |
+| accrom-b16 | 4,0 Mo | 37 ms | 0,013 / 0,044 / 0,088 ms | 15 Mo |
+
+La spécification demandait un p95 sous 0,3 ms : tenu avec une large marge sur cette machine. Non mesuré : navigateur réel, machine modeste, Firefox. Le passage à 2^16 cases double le poids du paquet (2 → 4 Mo).
+
+### Le simulateur face à l'extension
+
+Contrairement à ce que disait une première version de PROCESSUS §9, une vérification existe : `src/content/lid/costParity.test.ts` et `tools/lid/test_cost.py` lisent les mêmes 9 cas (`cost-cases.json`) et vérifient que les **règles de suppression** du simulateur sont celles du pipeline réel. Ce n'est pas le contrôle prévu (50 lignes réelles), et les autres coûts (drapeau, `sl`, silence) ne sont pas vérifiés contre l'extension.
+
+## 10 ter. Reproduire
+
+Données hors git, dans un dossier `<data>` (ici `C:\Users\kil\kct-data`). Python 3.10, numpy 2.2, Node 22. Graines fixes : `dataset.py` (`random.Random(0)`), `train.py` (`default_rng(0)`), `pseudo.py` (`default_rng(0)`).
+
+```
+python tools/lid/fetch_tatoeba.py --data <data>          # export per_language de downloads.tatoeba.org
+python tools/lid/dataset.py --data <data> --accents --romanized
+node --import tsx tools/lid/featurize.mjs --data <data>
+python tools/lid/train.py --data <data> --bits 16 --save accrom-b16
+node --import tsx tools/lid/answers.mjs --data <data>
+python tools/lid/cost.py --data <data> --model accrom-b16 [--pick 0.8,0.9,silence]
+python tools/lid/adapt.py --data <data> --model accrom-b16 --causal --k 10
+python tools/lid/report.py --data <data> --out report.json
+python tools/lid/ft_bench.py --data <data> --ft lid.176.ftz
+```
+
+La date de l'export Tatoeba n'a pas été notée au premier téléchargement (les fichiers locaux portent une date de réextraction). Les captures Kick du 04/11 et le jeu annoté ne sont pas publiés : la reproduction complète demande le dossier de données du propriétaire.
+
+## 10 quater. Données collectées et cadre
+
+- **Volume** : environ 1,25 million de lignes de chat brutes (112 Mo) au 22/11, plus les 28 000 lignes des captures du 04/11.
+- **Stockage** : uniquement sur le PC du propriétaire, hors de tout dépôt git. Les machines distantes (serveur, VM) ne gardent rien : chaque cycle efface son dossier après rapatriement.
+- **Kick** : points d'accès publics du site, lus par un navigateur classique, sans compte, rythme ralenti dès que le site refuse (taux de refus élevé, environ 78 %).
+- **Twitch** : IRC officiel en lecture anonyme (`justinfan`), sans compte, sans l'API interne.
+- **Ce qui est publié** : agrégats seulement. Aucun pseudo, aucun nom de chaîne, aucune ligne de chat.
+- **Conditions d'utilisation de Kick et Twitch** : pas examinées juridiquement pour cet usage (entraînement d'un modèle).
+- **Durée de conservation** : **non fixée, à décider par le propriétaire.**
 
 ## 11. Où est le code
 

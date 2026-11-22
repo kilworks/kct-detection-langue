@@ -38,11 +38,13 @@ Le modèle étudié ici sera livré dans une prochaine version de Kick Chat Tran
 
 | | Avant (master) | Modèle seul | Modèle + adaptation par chaîne |
 |---|:---:|:---:|:---:|
-| **Coût moyen par ligne** (Brave, plus bas = mieux) | 0,531 | 0,296 | **0,200** |
-| **Réponses fausses** sur 711 lignes de chat | 121 | 23 | *A VENIR* |
+| **Coût moyen par ligne** (Brave, plus bas = mieux) | 0,531 | 0,296 | **0,203** |
+| **Réponses fausses** sur 711 lignes de chat | 121 | 23 | 11 |
 | **Banc Tatoeba**, bonne langue trouvée | 82 % | 98 % | 98 % |
 
-> Chiffres sur le jeu **dev** : ils ont servi à choisir le modèle, ils sont donc optimistes. Le jeu **heldout** (993 lignes) ne sera lu qu'une fois, à la fin.
+> Chiffres sur le jeu **dev** : ils ont servi à choisir le modèle, ils sont donc optimistes. Le jeu **heldout** (993 lignes) ne sera lu qu'une fois pour ce modèle, à la fin ; ses totaux ont déjà servi à mesurer le détecteur actuel.
+>
+> Intervalles à 95 % (bootstrap apparié sur les 232 chaînes de dev) : le gain sur `master` et celui de l'adaptation sont nets ; celui de l'auto-apprentissage ne l'est pas encore. Référence publique : fastText lid.176 à la même place fait 0,390 de coût moyen. Détail dans [REVUE.md](REVUE.md) §10 bis.
 
 ---
 
@@ -79,7 +81,7 @@ flowchart LR
 
 | Étape | Choix |
 |---|---|
-| **Modèle** | linéaire sur n-grammes hachés dans 2^15 ou 2^16 cases (famille fastText), poids int8, 1,5 à 2,9 Mo, TypeScript pur, aucune dépendance |
+| **Modèle** | linéaire sur n-grammes hachés dans 2^15 ou 2^16 cases (famille fastText), poids int8, 1,5 à 2,9 Mo (2 à 4 Mo encodés dans le paquet), p95 0,05 ms par ligne, TypeScript pur, aucune dépendance |
 | **Entraînement** | Tatoeba (42 langues), augmenté vers le registre du chat : minuscules, sans ponctuation, fenêtres de 1 à 4 mots, sans accents, hindi et bengali romanisés |
 | **Auto-apprentissage** | chat Kick et Twitch non étiqueté, pseudo-étiquettes sûres (p ≥ 0,9 et langue déclarée de la chaîne d'accord) |
 | **Adaptation par chaîne** | l'extension compte les langues dont elle est sûre dans la chaîne en cours et ajuste ses probabilités, sans jamais voir la ligne jugée |
@@ -93,16 +95,18 @@ flowchart LR
 
 | Chemin | Avant | Modèle seul | + adaptation |
 |---|:---:|:---:|:---:|
-| Sans détecteur du navigateur (Brave) | 0,531 | 0,296 | **0,200** |
-| Chrome | 0,439 | 0,301 | **0,203** |
-| Firefox | 0,424 | 0,320 | **0,223** |
+| Sans détecteur du navigateur (Brave) | 0,531 | 0,296 | **0,203** |
+| Chrome | 0,439 | 0,301 | **0,205** |
+| Firefox | 0,424 | 0,320 | **0,222** |
+
+Adaptation causale (seules les lignes de la chaîne antérieures à la ligne jugée comptent, comme en direct), k = 10.
 
 ```mermaid
 xychart-beta
     title "Coût moyen par ligne (Brave, plus bas = mieux)"
     x-axis ["Avant", "Modèle seul", "+ adaptation"]
     y-axis "coût" 0 --> 0.6
-    bar [0.531, 0.296, 0.200]
+    bar [0.531, 0.296, 0.203]
 ```
 
 - **Sans détecteur du navigateur**, les réponses fausses passent de 121 à 23 sur 711 lignes (107 corrigées, 9 cassées, McNemar χ² = 81).
